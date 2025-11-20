@@ -18,7 +18,7 @@ dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
 modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', 'LCVSW', 'SWGG']
+titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', 'Multi-TSW', 'SWGG']
 colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown']
 
 # Arrays to store results
@@ -33,7 +33,7 @@ for i, seed in enumerate(seeds):
     N = 100  # Number of samples from p_X
     Xs.append(load_data(name=dataset_name, n_samples=N, dim=2))
     Xs[i] -= Xs[i].mean(dim=0)[np.newaxis, :]  # Normalization
-lear_rates = [args.lr_sw, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_sw, args.lr_sw, args.lr_sw, args.lr_sw]
+lear_rates = [args.lr_sw, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_sw, args.lr_sw, args.lr_sw]
 n_projs = [args.L, int(args.L / args.n_lines), int(args.L / args.n_lines), int(args.L / args.n_lines), args.L, args.L, args.L, args.L]
 
 
@@ -136,10 +136,22 @@ for k, title in enumerate(titles):
                 # print(f"Time taken for TWD orthogonal: {end_time - start_time:.4f} seconds")
 
             elif k == 4:
-                start_time = time.time()  # Start timing
-                loss += gradient_flow.LCVSW(X.to(device), Y.to(device), L=args.L)
-                end_time = time.time()  # End timing
-                # print(f"Time taken for LCVSW: {end_time - start_time:.4f} seconds")
+                start_time = time.time()
+                # multi-scale example: scales and ntrees chosen to match approx. total L
+                scales = [4, 8, 16]
+                # choose ntrees so that total projections ~ args.L (simple heuristic)
+                total_L = args.L
+                # distribute trees proportional to 1/scale (so fine scales get fewer trees)
+                inv_scales = [1.0/s for s in scales]
+                inv_sum = sum(inv_scales)
+                ntrees_per_scale = [max(1, int(round(total_L * (inv_scales[i]/inv_sum) / scales[i]))) for i in range(len(scales))]
+                # ensure at least 1 tree per scale
+                loss += gradient_flow.TWD_multi(X.to(device), Y.to(device),
+                                scales=scales, ntrees_per_scale=ntrees_per_scale,
+                                weights=None,
+                                mass_division='distance_based', p=args.p, delta=args.delta,
+                                device='cuda', gen_mode='gaussian_raw', mean=mean_X, std=args.std)
+                end_time = time.time()
 
             elif k == 5:
                 start_time = time.time()  # Start timing

@@ -207,6 +207,43 @@ def TWD(X, Y, theta, intercept, mass_division = 'distance_based', p = 2, delta =
     TWD_obj = TWConcurrentLines(p=p, delta=delta, mass_division=mass_division, device=device)
     return TWD_obj(X, Y, theta, intercept)
 
+def TWD_multi(X, Y, scales, ntrees_per_scale, weights=None,
+              mass_division='distance_based', p=2, delta=2., device='cuda',
+              gen_mode='gaussian_raw', mean=0.0, std=0.1):
+    """
+    Multi-scale Tree-Wasserstein.
+    - X, Y: (N,d) tensors
+    - scales: list of nlines per scale, e.g. [4,16,64]
+    - ntrees_per_scale: list of number of trees for each scale (same length)
+    - weights: optional list (same length); if None -> uniform normalized
+    - returns: torch scalar (tensor)
+    """
+    # sanity
+    assert len(scales) == len(ntrees_per_scale), "scales and ntrees_per_scale must match"
+    X = X.to(device)
+    Y = Y.to(device)
+    S = len(scales)
+    if weights is None:
+        w = torch.ones(S, device=device, dtype=torch.float32)
+        weights = (w / w.sum()).to(device)
+    else:
+        w = torch.tensor(weights, device=device, dtype=torch.float32)
+        weights = (w / w.sum()).to(device)
+
+    tw_obj = TWConcurrentLines(p=p, delta=delta, mass_division=mass_division, device=device)
+
+    per_scale_vals = []
+    for s in range(S):
+        nlines = scales[s]
+        ntrees = ntrees_per_scale[s]
+        theta_s, intercept_s = generate_trees_frames(ntrees, nlines, X.shape[1],
+                                                     mean=mean, std=std, device=device, gen_mode=gen_mode)
+        val_s = tw_obj(X, Y, theta_s, intercept_s)  # tensor scalar
+        per_scale_vals.append(val_s)
+
+    per_stack = torch.stack(per_scale_vals)   # (S,)
+    total = torch.dot(weights, per_stack)     # scalar tensor
+    return total
 
 import numpy as np
 import torch
