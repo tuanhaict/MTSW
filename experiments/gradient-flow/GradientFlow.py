@@ -17,9 +17,9 @@ from tqdm import tqdm
 dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
-modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', 'LCVSW', 'SWGG', 'MaxSW']
-colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown', 'pink']
+modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear']
+titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', 'LCVSW', 'SWGG']
+colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown']
 
 # Arrays to store results
 results = {}
