@@ -17,9 +17,9 @@ from tqdm import tqdm
 dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
-modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', 'Multi-TSW', 'SWGG']
-colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown']
+modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear']
+titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', 'Multi-TSW', 'Multi-TSW-orthogonal', 'SWGG']
+colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown', 'pink']
 
 # Arrays to store results
 results = {}
@@ -33,7 +33,7 @@ for i, seed in enumerate(seeds):
     N = 100  # Number of samples from p_X
     Xs.append(load_data(name=dataset_name, n_samples=N, dim=2))
     Xs[i] -= Xs[i].mean(dim=0)[np.newaxis, :]  # Normalization
-lear_rates = [args.lr_sw, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_sw, args.lr_sw, args.lr_sw]
+lear_rates = [args.lr_sw, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_sw, args.lr_sw]
 n_projs = [args.L, int(args.L / args.n_lines), int(args.L / args.n_lines), int(args.L / args.n_lines), args.L, args.L, args.L, args.L]
 
 
@@ -152,15 +152,32 @@ for k, title in enumerate(titles):
                                 mass_division='distance_based', p=args.p, delta=args.delta,
                                 device='cuda', gen_mode='gaussian_raw', mean=mean_X, std=args.std)
                 end_time = time.time()
-
             elif k == 5:
+                start_time = time.time()
+                # multi-scale example: scales and ntrees chosen to match approx. total L
+                scales = [4, 8, 16]
+                # choose ntrees so that total projections ~ args.L (simple heuristic)
+                total_L = args.L
+                # distribute trees proportional to 1/scale (so fine scales get fewer trees)
+                inv_scales = [1.0/s for s in scales]
+                inv_sum = sum(inv_scales)
+                ntrees_per_scale = [max(1, int(round(total_L * (inv_scales[i]/inv_sum) / scales[i]))) for i in range(len(scales))]
+                # ensure at least 1 tree per scale
+                loss += gradient_flow.TWD_multi(X.to(device), Y.to(device),
+                                scales=scales, ntrees_per_scale=ntrees_per_scale,
+                                weights=None,
+                                mass_division='distance_based', p=args.p, delta=args.delta,
+                                device='cuda', gen_mode='gaussian_orthogonal', mean=mean_X, std=args.std)
+                end_time = time.time()
+
+            elif k == 6:
                 start_time = time.time()  # Start timing
                 l, theta = gsw_res.SWGG_CP(X.to(device), Y.to(device), theta=None)
                 loss += l
                 end_time = time.time()  # End timing
                 # print(f"Time taken for SWGG_CP: {end_time - start_time:.4f} seconds")
 
-            elif k == 6:
+            elif k == 7:
                 start_time = time.time()  # Start timing
                 l, theta, loss_max = gsw_res.max_sw(X.to(device), Y, iterations=100, lr=lear_rates[k])
                 loss += l
