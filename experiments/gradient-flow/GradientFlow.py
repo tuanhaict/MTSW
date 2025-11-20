@@ -138,7 +138,7 @@ for k, title in enumerate(titles):
             elif k == 4:
                 start_time = time.time()
                 # multi-scale example: scales and ntrees chosen to match approx. total L
-                scales = [4, 8, 16]
+                scales = [4, 16]
                 # choose ntrees so that total projections ~ args.L (simple heuristic)
                 total_L = args.L
                 # distribute trees proportional to 1/scale (so fine scales get fewer trees)
