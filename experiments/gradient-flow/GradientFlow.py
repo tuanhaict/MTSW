@@ -145,7 +145,7 @@ for k, title in enumerate(titles):
                     std=args.std,
                     gen_mode='gaussian_raw',
                     device='cuda',
-                    diversity_mode="stratified"
+                    diversity_mode=args.diversity_mode
                 )  # orthogonal
                 loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
                 end_time = time.time()
@@ -159,7 +159,7 @@ for k, title in enumerate(titles):
                     std=args.std,
                     gen_mode='gaussian_orthogonal',
                     device='cuda',
-                    diversity_mode="stratified"
+                    diversity_mode=args.diversity_mode
                 )  # orthogonal
                 loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
                 end_time = time.time()
