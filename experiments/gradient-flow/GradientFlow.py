@@ -18,7 +18,7 @@ dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
 modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', 'Multi-TSW', 'Multi-TSW-orthogonal', 'SWGG']
+titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', 'Diversity-TSW', 'Diversity-TSW-orthogonal', 'SWGG']
 colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown', 'pink']
 
 # Arrays to store results
@@ -136,38 +136,32 @@ for k, title in enumerate(titles):
                 # print(f"Time taken for TWD orthogonal: {end_time - start_time:.4f} seconds")
 
             elif k == 4:
-                start_time = time.time()
-                # multi-scale example: scales and ntrees chosen to match approx. total L
-                scales = [4, 16]
-                # choose ntrees so that total projections ~ args.L (simple heuristic)
-                total_L = args.L
-                # distribute trees proportional to 1/scale (so fine scales get fewer trees)
-                inv_scales = [1.0/s for s in scales]
-                inv_sum = sum(inv_scales)
-                ntrees_per_scale = [max(1, int(round(total_L * (inv_scales[i]/inv_sum) / scales[i]))) for i in range(len(scales))]
-                # ensure at least 1 tree per scale
-                loss += gradient_flow.TWD_multi(X.to(device), Y.to(device),
-                                scales=scales, ntrees_per_scale=ntrees_per_scale,
-                                weights=None,
-                                mass_division='distance_based', p=args.p, delta=args.delta,
-                                device='cuda', gen_mode='gaussian_raw', mean=mean_X, std=args.std)
+                start_time = time.time()  # Start timing
+                theta_twd, intercept_twd = generate_trees_frames(
+                    ntrees=int(args.L / args.n_lines),
+                    nlines=args.n_lines,
+                    d=X.shape[1],
+                    mean=mean_X,
+                    std=args.std,
+                    gen_mode='gaussian_raw',
+                    device='cuda',
+                    diversity_mode="stratified"
+                )  # orthogonal
+                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
                 end_time = time.time()
             elif k == 5:
-                start_time = time.time()
-                # multi-scale example: scales and ntrees chosen to match approx. total L
-                scales = [4, 8, 16]
-                # choose ntrees so that total projections ~ args.L (simple heuristic)
-                total_L = args.L
-                # distribute trees proportional to 1/scale (so fine scales get fewer trees)
-                inv_scales = [1.0/s for s in scales]
-                inv_sum = sum(inv_scales)
-                ntrees_per_scale = [max(1, int(round(total_L * (inv_scales[i]/inv_sum) / scales[i]))) for i in range(len(scales))]
-                # ensure at least 1 tree per scale
-                loss += gradient_flow.TWD_multi(X.to(device), Y.to(device),
-                                scales=scales, ntrees_per_scale=ntrees_per_scale,
-                                weights=None,
-                                mass_division='distance_based', p=args.p, delta=args.delta,
-                                device='cuda', gen_mode='gaussian_orthogonal', mean=mean_X, std=args.std)
+                start_time = time.time()  # Start timing
+                theta_twd, intercept_twd = generate_trees_frames(
+                    ntrees=int(args.L / args.n_lines),
+                    nlines=args.n_lines,
+                    d=X.shape[1],
+                    mean=mean_X,
+                    std=args.std,
+                    gen_mode='gaussian_orthogonal',
+                    device='cuda',
+                    diversity_mode="stratified"
+                )  # orthogonal
+                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
                 end_time = time.time()
 
             elif k == 6:
