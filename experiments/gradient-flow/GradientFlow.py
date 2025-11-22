@@ -9,7 +9,7 @@ import pickle
 
 from core.utils_GF import load_data, w2
 import core.gradient_flow as gradient_flow
-from db_tsw.utils import compute_adaptive_mean, generate_trees_frames
+from db_tsw.utils import compute_adaptive_mean, generate_trees_frames, generate_trees_frames_diff_aware
 import cfg
 args = cfg.parse_args()
 from tqdm import tqdm
@@ -138,11 +138,13 @@ for k, title in enumerate(titles):
             elif k == 4:
                 start_time = time.time()  # Start timing
                 adaptive_mean = compute_adaptive_mean(X, Y)
-                theta_twd, intercept_twd = generate_trees_frames(
+                theta_twd, intercept_twd = generate_trees_frames_diff_aware(
                     ntrees=int(args.L / args.n_lines),
                     nlines=args.n_lines,
                     d=X.shape[1],
                     mean=adaptive_mean,
+                    X=X,
+                    Y=Y,
                     std=args.std,
                     gen_mode='gaussian_orthogonal',
                     device='cuda'
@@ -152,10 +154,12 @@ for k, title in enumerate(titles):
             elif k == 5:
                 start_time = time.time()  # Start timing
                 adaptive_mean = compute_adaptive_mean(X, Y)
-                theta_twd, intercept_twd = generate_trees_frames(
+                theta_twd, intercept_twd = generate_trees_frames_diff_aware(
                     ntrees=int(args.L / args.n_lines),
                     nlines=args.n_lines,
                     d=X.shape[1],
+                    X=X,
+                    Y=Y,
                     mean=adaptive_mean,
                     std=args.std,
                     gen_mode='gaussian_raw',
