@@ -6,19 +6,10 @@ def svd_orthogonalize(matrix):
     return U
 
 
-def compute_adaptive_mean(X, Y):
-    """
-    Compute adaptive mean from supports of both distributions.
-    
-    Args:
-        X: Source supports (n, d)
-        Y: Target supports (m, d)
-    
-    Returns:
-        mean: Midpoint of centroids (d,)
-    """
-    centroid_X = X.mean(dim=0)
-    centroid_Y = Y.mean(dim=0)
+def compute_adaptive_mean(X, Y, device='cuda'):
+    """Compute midpoint of centroids."""
+    centroid_X = X.mean(dim=0).to(device)
+    centroid_Y = Y.mean(dim=0).to(device)
     return (centroid_X + centroid_Y) / 2
 
 
