@@ -9,7 +9,7 @@ import pickle
 
 from core.utils_GF import load_data, w2
 import core.gradient_flow as gradient_flow
-from db_tsw.utils import generate_trees_frames
+from db_tsw.utils import compute_adaptive_mean, generate_trees_frames
 import cfg
 args = cfg.parse_args()
 from tqdm import tqdm
@@ -18,7 +18,7 @@ dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
 modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', 'Diversity-TSW', 'Diversity-TSW-orthogonal', 'SWGG']
+titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', 'Modify-TSW-orthogonal', 'Modify-TSW', 'SWGG']
 colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown', 'pink']
 
 # Arrays to store results
@@ -137,32 +137,32 @@ for k, title in enumerate(titles):
 
             elif k == 4:
                 start_time = time.time()  # Start timing
+                adaptive_mean = compute_adaptive_mean(X, Y)
                 theta_twd, intercept_twd = generate_trees_frames(
                     ntrees=int(args.L / args.n_lines),
                     nlines=args.n_lines,
                     d=X.shape[1],
-                    mean=mean_X,
-                    std=args.std,
-                    gen_mode='gaussian_raw',
-                    device='cuda',
-                    diversity_mode=args.diversity_mode
-                )  # orthogonal
-                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
-                end_time = time.time()
-            elif k == 5:
-                start_time = time.time()  # Start timing
-                theta_twd, intercept_twd = generate_trees_frames(
-                    ntrees=int(args.L / args.n_lines),
-                    nlines=args.n_lines,
-                    d=X.shape[1],
-                    mean=mean_X,
+                    mean=adaptive_mean,
                     std=args.std,
                     gen_mode='gaussian_orthogonal',
-                    device='cuda',
-                    diversity_mode=args.diversity_mode
+                    device='cuda'
                 )  # orthogonal
                 loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
-                end_time = time.time()
+                end_time = time.time()  # End timing
+            elif k == 5:
+                start_time = time.time()  # Start timing
+                adaptive_mean = compute_adaptive_mean(X, Y)
+                theta_twd, intercept_twd = generate_trees_frames(
+                    ntrees=int(args.L / args.n_lines),
+                    nlines=args.n_lines,
+                    d=X.shape[1],
+                    mean=adaptive_mean,
+                    std=args.std,
+                    gen_mode='gaussian_raw',
+                    device='cuda'
+                )  # orthogonal
+                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
+                end_time = time.time()  # End timing
 
             elif k == 6:
                 start_time = time.time()  # Start timing

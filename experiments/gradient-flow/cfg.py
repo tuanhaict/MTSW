@@ -18,11 +18,6 @@ def parse_args():
         default=2500,
         help='Mumber of training epochs')
     parser.add_argument(
-        '--diversity_mode',
-        type=str,
-        default='stratified',
-        help='Diversity mode for tree generation')
-    parser.add_argument(
         '--L',
         type=int,
         default=1000,
