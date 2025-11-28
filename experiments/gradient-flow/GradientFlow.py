@@ -9,7 +9,7 @@ import pickle
 
 from core.utils_GF import load_data, w2
 import core.gradient_flow as gradient_flow
-from db_tsw.utils import generate_random_projecting_tree_frames, generate_trees_frames
+from db_tsw.utils import generate_adaptive_geometric_trees, generate_frequency_domain_trees, generate_information_theoretic_trees, generate_random_projecting_tree_frames, generate_trees_frames
 import cfg
 args = cfg.parse_args()
 from tqdm import tqdm
@@ -17,9 +17,9 @@ from tqdm import tqdm
 dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
-modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-RPTF"]
-colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown']
+modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear']
+titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-AGT", "TSW-SL-FDT", "TSW-SL-ITT"]
+colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown', 'pink', 'gray']
 
 # Arrays to store results
 results = {}
@@ -33,7 +33,7 @@ for i, seed in enumerate(seeds):
     N = 100  # Number of samples from p_X
     Xs.append(load_data(name=dataset_name, n_samples=N, dim=2))
     Xs[i] -= Xs[i].mean(dim=0)[np.newaxis, :]  # Normalization
-lear_rates = [args.lr_sw, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_sw, args.lr_sw]
+lear_rates = [args.lr_sw, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_tsw_sl, args.lr_sw]
 n_projs = [args.L, int(args.L / args.n_lines), int(args.L / args.n_lines), int(args.L / args.n_lines), args.L, args.L, args.L, args.L]
 
 
@@ -136,20 +136,43 @@ for k, title in enumerate(titles):
                 # print(f"Time taken for TWD orthogonal: {end_time - start_time:.4f} seconds")
             elif k == 4:
                 start_time = time.time()  # Start timing
-                theta_twd, intercept_twd = generate_random_projecting_tree_frames(
+                theta_twd, intercept_twd = generate_adaptive_geometric_trees(
                     X=X,
                     Y=Y,
                     ntrees=int(args.L / args.n_lines),
                     nlines=args.n_lines,
                     d=X.shape[1],
-                    mean=mean_X,
-                    std=args.std,
                     device='cuda'
                 )  # orthogonal
                 loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
                 end_time = time.time()
                 # print(f"Time taken for SWGG_CP: {end_time - start_time:.4f} seconds")
-
+            elif k == 5:
+                start_time = time.time()  # Start timing
+                theta_twd, intercept_twd = generate_frequency_domain_trees(
+                    X=X,
+                    Y=Y,
+                    ntrees=int(args.L / args.n_lines),
+                    nlines=args.n_lines,
+                    d=X.shape[1],
+                    device='cuda'
+                )  # orthogonal
+                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
+                end_time = time.time()
+                # print(f"Time taken for SWGG_CP: {end_time - start_time:.4f} seconds")
+            elif k == 6:
+                start_time = time.time()  # Start timing
+                theta_twd, intercept_twd = generate_information_theoretic_trees(
+                    X=X,
+                    Y=Y,
+                    ntrees=int(args.L / args.n_lines),
+                    nlines=args.n_lines,
+                    d=X.shape[1],
+                    device='cuda'
+                )  # orthogonal
+                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
+                end_time = time.time()
+                # print(f"Time taken for SWGG_CP: {end_time - start_time:.4f} seconds")
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

@@ -38,6 +38,11 @@ def parse_args():
         default=1e-3,
         help='TWD: learning rate of TWD methods')
     parser.add_argument(
+        '--lr_tsw_sl_mod',
+        type=float,
+        default=1e-3,
+        help='TWD: learning rate of TWD modified methods')
+    parser.add_argument(
         '--delta',
         type=float,
         default=50.,

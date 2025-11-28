@@ -59,3 +59,119 @@ def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, st
     theta = theta.reshape(ntrees, nlines, d)
     
     return theta, intercept
+
+def generate_adaptive_geometric_trees(X, Y, ntrees, nlines, d, device='cuda', 
+                                    concentration_factor=10, geometric_factor=0.5):
+    """
+    Generate trees based on the geometric structure of X and Y distributions
+    using principal directions and optimal transport theory
+    """
+    X, Y = X.to(device), Y.to(device)
+    
+    # Compute principal directions from covariance difference
+    mean_X, mean_Y = X.mean(dim=0), Y.mean(dim=0)
+    cov_X = torch.cov(X.T)
+    cov_Y = torch.cov(Y.T) 
+    
+    # Principal directions from covariance difference (mathematically motivated)
+    cov_diff = cov_X - cov_Y
+    eigenvals, eigenvecs = torch.linalg.eigh(cov_diff)
+    
+    # Use top-k eigenvectors as principal directions
+    principal_dirs = eigenvecs[:, -nlines:].T  # (nlines, d)
+    
+    # Adaptive root placement using Wasserstein barycenter approximation
+    alpha = torch.rand(ntrees, 1, device=device)
+    roots = alpha * mean_X.unsqueeze(0) + (1 - alpha) * mean_Y.unsqueeze(0)
+    
+    # Add geometric perturbation
+    noise_scale = geometric_factor * torch.norm(mean_X - mean_Y) / concentration_factor
+    geometric_noise = torch.randn(ntrees, 1, d, device=device) * noise_scale
+    intercept = roots.unsqueeze(1) + geometric_noise
+    
+    # Replicate principal directions for all trees
+    theta = principal_dirs.unsqueeze(0).repeat(ntrees, 1, 1)  # (ntrees, nlines, d)
+    
+    return theta, intercept
+
+def generate_frequency_domain_trees(X, Y, ntrees, nlines, d, device='cuda'):
+    """
+    Generate trees using frequency domain analysis of the distributions
+    """
+    # Compute empirical characteristic functions (Fourier analysis)
+    def empirical_char_func(data, frequencies):
+        # φ(t) = E[exp(i⟨t, X⟩)]
+        inner_prod = torch.matmul(frequencies, data.T)  # (nfreq, n_samples)
+        return torch.mean(torch.exp(1j * inner_prod), dim=1)
+    
+    # Sample frequency vectors
+    freq_samples = torch.randn(nlines * 10, d, device=device)
+    freq_samples = freq_samples / torch.norm(freq_samples, dim=1, keepdim=True)
+    
+    # Compute characteristic function difference
+    char_X = empirical_char_func(X, freq_samples)
+    char_Y = empirical_char_func(Y, freq_samples)
+    char_diff = torch.abs(char_X - char_Y)
+    
+    # Select frequencies with largest differences
+    top_indices = torch.topk(char_diff.real, nlines)[1]
+    optimal_dirs = freq_samples[top_indices]  # (nlines, d)
+    
+    # Generate roots using moment matching
+    moment_1_diff = X.mean(dim=0) - Y.mean(dim=0)
+    roots = torch.randn(ntrees, 1, d, device=device) * 0.1
+    roots = roots + moment_1_diff.unsqueeze(0).unsqueeze(0) * 0.5
+    
+    theta = optimal_dirs.unsqueeze(0).repeat(ntrees, 1, 1)
+    
+    return theta, roots
+
+def generate_information_theoretic_trees(X, Y, ntrees, nlines, d, device='cuda'):
+    """
+    Generate trees to maximize mutual information with distribution differences
+    """
+    # Compute mutual information-based directions
+    def compute_mi_direction(data1, data2, direction):
+        # Project data onto direction
+        proj1 = torch.matmul(data1, direction)
+        proj2 = torch.matmul(data2, direction)
+        
+        # Estimate MI using histogram-based method (simplified)
+        bins = 50
+        hist1, _ = torch.histogram(proj1, bins=bins)
+        hist2, _ = torch.histogram(proj2, bins=bins)
+        
+        # Normalize to get probabilities
+        p1 = hist1.float() / torch.sum(hist1)
+        p2 = hist2.float() / torch.sum(hist2)
+        
+        # KL divergence as proxy for MI
+        kl_div = torch.sum(p1 * torch.log((p1 + 1e-8) / (p2 + 1e-8)))
+        return kl_div
+    
+    # Optimize directions to maximize information
+    candidate_dirs = torch.randn(nlines * 5, d, device=device)
+    candidate_dirs = candidate_dirs / torch.norm(candidate_dirs, dim=1, keepdim=True)
+    
+    mi_scores = torch.zeros(nlines * 5, device=device)
+    for i, direction in enumerate(candidate_dirs):
+        mi_scores[i] = compute_mi_direction(X, Y, direction)
+    
+    # Select top directions
+    top_indices = torch.topk(mi_scores, nlines)[1]
+    optimal_dirs = candidate_dirs[top_indices]
+    
+    # Strategic root placement using Fisher information
+    fisher_info_X = torch.inverse(torch.cov(X.T) + torch.eye(d, device=device) * 1e-6)
+    fisher_info_Y = torch.inverse(torch.cov(Y.T) + torch.eye(d, device=device) * 1e-6)
+    
+    # Roots based on Fisher information geometry
+    mean_X, mean_Y = X.mean(dim=0), Y.mean(dim=0)
+    fisher_diff = fisher_info_X - fisher_info_Y
+    
+    roots = torch.randn(ntrees, 1, d, device=device) * 0.1
+    roots = roots + 0.3 * torch.matmul(fisher_diff, (mean_X - mean_Y)).unsqueeze(0).unsqueeze(0)
+    
+    theta = optimal_dirs.unsqueeze(0).repeat(ntrees, 1, 1)
+    
+    return theta, roots
