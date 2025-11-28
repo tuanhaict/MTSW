@@ -9,7 +9,7 @@ import pickle
 
 from core.utils_GF import load_data, w2
 import core.gradient_flow as gradient_flow
-from db_tsw.utils import compute_adaptive_mean, generate_trees_frames, generate_trees_frames_diff_aware
+from db_tsw.utils import compute_adaptive_mean, generate_random_projecting_tree_frames, generate_trees_frames, generate_trees_frames_diff_aware
 import cfg
 args = cfg.parse_args()
 from tqdm import tqdm
@@ -17,9 +17,9 @@ from tqdm import tqdm
 dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
-modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', 'Modify-TSW-orthogonal', 'Modify-TSW', 'SWGG']
-colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown', 'pink']
+modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear']
+titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal']
+colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown']
 
 # Arrays to store results
 results = {}
@@ -134,53 +134,21 @@ for k, title in enumerate(titles):
                 loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
                 end_time = time.time()  # End timing
                 # print(f"Time taken for TWD orthogonal: {end_time - start_time:.4f} seconds")
-
             elif k == 4:
                 start_time = time.time()  # Start timing
-                adaptive_mean = compute_adaptive_mean(X, Y)
-                theta_twd, intercept_twd = generate_trees_frames_diff_aware(
+                theta_twd, intercept_twd = generate_random_projecting_tree_frames(
+                    X=X,
+                    Y=Y,
                     ntrees=int(args.L / args.n_lines),
                     nlines=args.n_lines,
                     d=X.shape[1],
-                    mean=adaptive_mean,
-                    X=X,
-                    Y=Y,
+                    mean=mean_X,
                     std=args.std,
-                    gen_mode='gaussian_orthogonal',
                     device='cuda'
                 )  # orthogonal
                 loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
-                end_time = time.time()  # End timing
-            elif k == 5:
-                start_time = time.time()  # Start timing
-                adaptive_mean = compute_adaptive_mean(X, Y)
-                theta_twd, intercept_twd = generate_trees_frames_diff_aware(
-                    ntrees=int(args.L / args.n_lines),
-                    nlines=args.n_lines,
-                    d=X.shape[1],
-                    X=X,
-                    Y=Y,
-                    mean=adaptive_mean,
-                    std=args.std,
-                    gen_mode='gaussian_raw',
-                    device='cuda'
-                )  # orthogonal
-                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
-                end_time = time.time()  # End timing
-
-            elif k == 6:
-                start_time = time.time()  # Start timing
-                l, theta = gsw_res.SWGG_CP(X.to(device), Y.to(device), theta=None)
-                loss += l
-                end_time = time.time()  # End timing
+                end_time = time.time()
                 # print(f"Time taken for SWGG_CP: {end_time - start_time:.4f} seconds")
-
-            elif k == 7:
-                start_time = time.time()  # Start timing
-                l, theta, loss_max = gsw_res.max_sw(X.to(device), Y, iterations=100, lr=lear_rates[k])
-                loss += l
-                end_time = time.time()  # End timing
-                # print(f"Time taken for max SW: {end_time - start_time:.4f} seconds")
 
             optimizer.zero_grad()
             loss.backward()
