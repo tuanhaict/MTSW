@@ -98,6 +98,7 @@ def generate_frequency_domain_trees(X, Y, ntrees, nlines, d, device='cuda'):
     """
     Generate trees using frequency domain analysis of the distributions
     """
+    X, Y = X.to(device), Y.to(device)
     # Compute empirical characteristic functions (Fourier analysis)
     def empirical_char_func(data, frequencies):
         # φ(t) = E[exp(i⟨t, X⟩)]
@@ -130,6 +131,7 @@ def generate_information_theoretic_trees(X, Y, ntrees, nlines, d, device='cuda')
     """
     Generate trees to maximize mutual information with distribution differences
     """
+    X, Y = X.to(device), Y.to(device)
     # Compute mutual information-based directions
     def compute_mi_direction(data1, data2, direction):
         # Project data onto direction
