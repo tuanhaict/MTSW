@@ -2,6 +2,7 @@ import torch
 import time
 import numpy as np
 from .von_mises_fisher import VonMisesFisher
+from .power_spherical import PowerSpherical
 def svd_orthogonalize(matrix):
     U, _, _ = torch.linalg.svd(matrix, full_matrices=False)
     return U
@@ -115,12 +116,10 @@ def generate_power_spherical_rpt_frames(X, Y, ntrees, nlines, d, mean=123, std=0
     base_theta = X[x_indices] - Y[y_indices]
     base_theta = base_theta / torch.norm(base_theta, dim=1, keepdim=True)
     
-    # Adaptive concentration parameter
-    current_distance = torch.norm(X.mean(dim=0) - Y.mean(dim=0))
-    adaptive_kappa = kappa / (current_distance.item() + 0.1)  # Convert to scalar
-    
-    # Apply VonMisesFisher concentration
-    vmf = VonMisesFisher(loc=base_theta, scale=torch.full((total_lines,), adaptive_kappa, device=device))
-    theta = vmf.rsample()
+    ps = PowerSpherical(
+        loc=base_theta,
+        scale=torch.full((total_lines,), kappa, device=device),
+    )
+    theta = ps.rsample()
     
     return theta.reshape(ntrees, nlines, d), intercept
