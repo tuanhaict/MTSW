@@ -38,23 +38,96 @@ def generate_trees_frames(ntrees, nlines, d, mean=128, std=0.1, device='cuda', g
     
     return theta, intercept
 
-def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, std = 0.1, device='cuda'):
+# def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, std = 0.1, device='cuda'):
+#     X = X.to(device)
+#     Y = Y.to(device)
+#     if isinstance(mean, (int, float)):
+#         root = torch.randn(ntrees, 1, d, device=device) * std + mean
+#     else:
+#         # mean is tensor (d,)
+#         mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
+#         root = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
+    
+#     intercept = root
+    
+#     total_lines = ntrees * nlines
+#     x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
+#     y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
+    
+#     theta = X[x_indices] - Y[y_indices]
+#     theta = theta / torch.sqrt(torch.sum(theta ** 2, dim=1, keepdim=True))
+#     theta = theta.reshape(ntrees, nlines, d)
+    
+#     return theta, intercept
+def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, std=0.1, device='cuda', iteration=None):
     X = X.to(device)
     Y = Y.to(device)
-    if isinstance(mean, (int, float)):
-        root = torch.randn(ntrees, 1, d, device=device) * std + mean
+    
+    # Compute current distance to determine convergence phase
+    mean_X, mean_Y = X.mean(dim=0), Y.mean(dim=0)
+    current_distance = torch.norm(mean_X - mean_Y).item()
+    
+    # Adaptive root placement based on convergence phase
+    if current_distance < 0.1:  # Near convergence - be more conservative
+        if isinstance(mean, (int, float)):
+            # Place roots closer to target for final convergence
+            root = mean_Y.unsqueeze(0).unsqueeze(0).repeat(ntrees, 1, 1)
+            root += torch.randn(ntrees, 1, d, device=device) * (std * 0.1)  # Much smaller noise
+        else:
+            mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
+            root = mean_tensor.view(1, 1, d).repeat(ntrees, 1, 1)
+            root += torch.randn(ntrees, 1, d, device=device) * (std * 0.1)
     else:
-        # mean is tensor (d,)
-        mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
-        root = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
+        # Far from convergence - normal placement
+        if isinstance(mean, (int, float)):
+            root = torch.randn(ntrees, 1, d, device=device) * std + mean
+        else:
+            mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
+            root = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
     
     intercept = root
     
-    total_lines = ntrees * nlines
-    x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
-    y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
+    # Enhanced direction selection
+    if current_distance < 0.05:  # Very close - use best directions only
+        n_candidates = ntrees * nlines * 5  # Many candidates
+        x_indices = np.random.choice(X.shape[0], n_candidates, replace=True)
+        y_indices = np.random.choice(Y.shape[0], n_candidates, replace=True)
+        
+        # Get all candidate directions
+        candidate_theta = X[x_indices] - Y[y_indices]
+        candidate_magnitudes = torch.norm(candidate_theta, dim=1)
+        
+        # Select top directions with highest magnitude (most informative)
+        total_lines = ntrees * nlines
+        top_indices = torch.topk(candidate_magnitudes, total_lines)[1]
+        theta = candidate_theta[top_indices]
+        
+    elif current_distance < 0.2:  # Moderate distance - mixed strategy
+        total_lines = ntrees * nlines
+        n_candidates = total_lines * 2
+        x_indices = np.random.choice(X.shape[0], n_candidates, replace=True)
+        y_indices = np.random.choice(Y.shape[0], n_candidates, replace=True)
+        
+        candidate_theta = X[x_indices] - Y[y_indices]
+        candidate_magnitudes = torch.norm(candidate_theta, dim=1)
+        
+        # Mix of top directions and random
+        n_top = total_lines // 2
+        n_random = total_lines - n_top
+        
+        top_indices = torch.topk(candidate_magnitudes, n_top)[1]
+        random_indices = np.random.choice(n_candidates, n_random, replace=False)
+        
+        selected_indices = torch.cat([top_indices, torch.tensor(random_indices, device=device)])
+        theta = candidate_theta[selected_indices]
+        
+    else:  # Far from convergence - original strategy
+        total_lines = ntrees * nlines
+        x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
+        y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
+        theta = X[x_indices] - Y[y_indices]
     
-    theta = X[x_indices] - Y[y_indices]
+    # Normalize directions
     theta = theta / torch.sqrt(torch.sum(theta ** 2, dim=1, keepdim=True))
     theta = theta.reshape(ntrees, nlines, d)
     
