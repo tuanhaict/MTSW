@@ -18,7 +18,7 @@ dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
 modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-AGT", "TSW-SL-FDT", "TSW-SL-ITT", "TSW-SL-RPT"]
+titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-AGT", "TSW-SL-FDT", "TSW-SL-RPT"]
 colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown', 'pink', 'gray']
 
 # Arrays to store results
@@ -161,19 +161,6 @@ for k, title in enumerate(titles):
                 end_time = time.time()
                 # print(f"Time taken for SWGG_CP: {end_time - start_time:.4f} seconds")
             elif k == 6:
-                start_time = time.time()  # Start timing
-                theta_twd, intercept_twd = generate_information_theoretic_trees(
-                    X=X,
-                    Y=Y,
-                    ntrees=int(args.L / args.n_lines),
-                    nlines=args.n_lines,
-                    d=X.shape[1],
-                    device='cuda'
-                )  # orthogonal
-                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
-                end_time = time.time()
-                # print(f"Time taken for SWGG_CP: {end_time - start_time:.4f} seconds")
-            elif k == 7:
                 start_time = time.time()  # Start timing
                 theta_twd, intercept_twd = generate_random_projecting_tree_frames(
                     X=X,
