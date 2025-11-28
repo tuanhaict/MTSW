@@ -107,7 +107,7 @@ def generate_power_spherical_rpt_frames(X, Y, ntrees, nlines, d, mean=123, std=0
         root = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
     intercept = root
     
-    # Generate base directions & apply VonMisesFisher concentration
+    # Generate base directions
     total_lines = ntrees * nlines
     x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
     y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
@@ -117,7 +117,7 @@ def generate_power_spherical_rpt_frames(X, Y, ntrees, nlines, d, mean=123, std=0
     
     # Adaptive concentration parameter
     current_distance = torch.norm(X.mean(dim=0) - Y.mean(dim=0))
-    adaptive_kappa = kappa / (current_distance + 0.1)
+    adaptive_kappa = kappa / (current_distance.item() + 0.1)  # Convert to scalar
     
     # Apply VonMisesFisher concentration
     vmf = VonMisesFisher(loc=base_theta, scale=torch.full((total_lines,), adaptive_kappa, device=device))
