@@ -1,7 +1,7 @@
 import torch
 import time
 import numpy as np
-
+from torch.distributions import VonMisesFisher
 def svd_orthogonalize(matrix):
     U, _, _ = torch.linalg.svd(matrix, full_matrices=False)
     return U
@@ -95,3 +95,32 @@ def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, st
     theta = theta.reshape(ntrees, nlines, d)
     
     return theta, intercept
+
+def generate_power_spherical_rpt_frames(X, Y, ntrees, nlines, d, mean=123, std=0.1, device='cuda', kappa=10.0):
+    X, Y = X.to(device), Y.to(device)
+    
+    # Root placement
+    if isinstance(mean, (int, float)):
+        root = torch.randn(ntrees, 1, d, device=device) * std + mean
+    else:
+        mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
+        root = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
+    intercept = root
+    
+    # Generate base directions & apply VonMisesFisher
+    total_lines = ntrees * nlines
+    x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
+    y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
+    
+    base_theta = X[x_indices] - Y[y_indices]
+    base_theta = base_theta / torch.norm(base_theta, dim=1, keepdim=True)
+    
+    # Adaptive concentration
+    current_distance = torch.norm(X.mean(dim=0) - Y.mean(dim=0))
+    adaptive_kappa = kappa / (current_distance + 0.1)
+    
+    # VonMisesFisher sampling
+    vmf = VonMisesFisher(base_theta, torch.full((total_lines,), adaptive_kappa, device=device))
+    theta = vmf.rsample()
+    
+    return theta.reshape(ntrees, nlines, d), intercept
