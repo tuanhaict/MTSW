@@ -44,7 +44,8 @@ for k, title in enumerate(titles):
         X = Xs[i].detach().clone()
         meanX = 0
         _, d = X.shape
-
+        prev_theta = None
+        prev_distances = None
         # Construct folder name based on hyperparameters
         args_dict = vars(args)
         folder_info = '-'.join([f"{key.replace('_', '')}{value}" for key, value in args_dict.items()])
@@ -136,7 +137,7 @@ for k, title in enumerate(titles):
                 # print(f"Time taken for TWD orthogonal: {end_time - start_time:.4f} seconds")
             elif k == 4:
                 start_time = time.time()  # Start timing
-                theta_twd, intercept_twd = generate_power_spherical_rpt_frames(
+                theta_twd, intercept_twd, current_distances = generate_random_projecting_tree_frames(
                     X=X,
                     Y=Y,
                     ntrees=int(args.L / args.n_lines),
@@ -145,9 +146,13 @@ for k, title in enumerate(titles):
                     mean=mean_X,
                     std=args.std,
                     device='cuda',
-                    kappa=10.0
+                    prev_theta=prev_theta,
+                    prev_distances=prev_distances,
                 )  # orthogonal
                 loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
+                with torch.no_grad():
+                    prev_theta = theta_twd.detach().clone()
+                    prev_distances = current_distances.detach().clone()
                 end_time = time.time()  # End timing
             optimizer.zero_grad()
             loss.backward()

@@ -60,11 +60,24 @@ def generate_trees_frames(ntrees, nlines, d, mean=128, std=0.1, device='cuda', g
 #     theta = theta.reshape(ntrees, nlines, d)
     
 #     return theta, intercept
-def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, std=0.1, device='cuda'):
+def generate_momentum_projecting_tree_frames(X, Y, ntrees, nlines, d, 
+                                           prev_theta=None, prev_distances=None,
+                                           beta_max=0.9, delta=1e-3, eps_0=1e-6, alpha=0.75,
+                                           mean=123, std=0.1, device='cuda'):
+    """
+    Generate tree projection frames with adaptive momentum regularization
+    
+    Args:
+        X, Y: Input distributions
+        ntrees, nlines, d: Tree structure parameters
+        prev_theta: Previous projection directions (ntrees, nlines, d)
+        prev_distances: Previous ||X-Y|| distances for adaptive regularization
+        beta_max, delta, eps_0, alpha: Momentum hyperparameters
+    """
     X = X.to(device)
     Y = Y.to(device)
     
-    # Root placement
+    # Initialize root (unchanged)
     if isinstance(mean, (int, float)):
         root = torch.randn(ntrees, 1, d, device=device) * std + mean
     else:
@@ -73,29 +86,56 @@ def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, st
     
     intercept = root
     
-    # KEY FIX: Bias sampling toward high-difference pairs
-    mean_X, mean_Y = X.mean(dim=0), Y.mean(dim=0)
-    
-    # Compute distances from each X point to Y mean (and vice versa)
-    X_to_Y_dist = torch.norm(X - mean_Y.unsqueeze(0), dim=1)
-    Y_to_X_dist = torch.norm(Y - mean_X.unsqueeze(0), dim=1)
-    
-    # Create probability weights (outliers more likely to be selected)
-    X_weights = X_to_Y_dist / X_to_Y_dist.sum()
-    Y_weights = Y_to_X_dist / Y_to_X_dist.sum()
-    
+    # Sample indices
     total_lines = ntrees * nlines
+    x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
+    y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
     
-    # Weighted sampling instead of uniform
-    x_indices = torch.multinomial(X_weights, total_lines, replacement=True)
-    y_indices = torch.multinomial(Y_weights, total_lines, replacement=True)
+    # Compute current raw directions
+    diff_vectors = X[x_indices] - Y[y_indices]  # (total_lines, d)
     
-    # Generate directions
-    theta = X[x_indices] - Y[y_indices]
-    theta = theta / torch.sqrt(torch.sum(theta ** 2, dim=1, keepdim=True))
+    # Compute distances for adaptive parameters
+    distances = torch.sqrt(torch.sum(diff_vectors ** 2, dim=1))  # (total_lines,)
+    
+    # Adaptive epsilon regularization
+    if prev_distances is not None:
+        initial_distances = prev_distances.mean()
+        eps_t = eps_0 * (distances / initial_distances) ** alpha
+    else:
+        eps_t = eps_0 * torch.ones_like(distances)
+    
+    # Regularized normalization
+    eps_t = eps_t.unsqueeze(1)  # (total_lines, 1)
+    current_directions = diff_vectors / (distances.unsqueeze(1) + eps_t)
+    
+    # Adaptive momentum coefficient
+    beta_t = torch.clamp(
+        beta_max - delta / (distances + eps_0),
+        min=0.0, max=beta_max
+    )  # (total_lines,)
+    
+    # Apply momentum if previous directions exist
+    if prev_theta is not None:
+        prev_theta_flat = prev_theta.view(total_lines, d)  # Flatten previous directions
+        beta_t = beta_t.unsqueeze(1)  # (total_lines, 1)
+        
+        # Momentum update: v_{t+1} = β_t * v_t + (1-β_t) * current_direction
+        momentum_directions = beta_t * prev_theta_flat + (1 - beta_t) * current_directions
+    else:
+        # First iteration: no momentum
+        momentum_directions = current_directions
+    
+    # Final normalization
+    momentum_norms = torch.sqrt(torch.sum(momentum_directions ** 2, dim=1, keepdim=True))
+    theta = momentum_directions / (momentum_norms + 1e-12)  # Numerical stability
+    
+    # Reshape back to tree structure
     theta = theta.reshape(ntrees, nlines, d)
     
-    return theta, intercept
+    # Return distances for next iteration
+    distances_reshaped = distances.reshape(ntrees, nlines)
+    
+    return theta, intercept, distances_reshaped
 
 def generate_power_spherical_rpt_frames(X, Y, ntrees, nlines, d, mean=123, std=0.1, device='cuda', kappa=10.0):
     X, Y = X.to(device), Y.to(device)
