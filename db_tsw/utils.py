@@ -170,7 +170,8 @@ def generate_power_spherical_rpt_frames(X, Y, ntrees, nlines, d, mean=123, std=0
     
     # Strategy 4: Power law concentration
     adaptive_kappa = kappa * torch.pow(1 / (mean_distance + 0.1), 0.5)
-    
+    print(f"Adaptive kappa: {adaptive_kappa.item():.4f}")
+    print(f"Mean distance between X and Y: {mean_distance.item():.4f}")    
     # Strategy 5: Logarithmic concentration
     # adaptive_kappa = kappa * torch.log(1 / (mean_distance + 0.1) + 1)
     
