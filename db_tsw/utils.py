@@ -39,27 +39,27 @@ def generate_trees_frames(ntrees, nlines, d, mean=128, std=0.1, device='cuda', g
     
     return theta, intercept
 
-# def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, std = 0.1, device='cuda'):
-#     X = X.to(device)
-#     Y = Y.to(device)
-#     if isinstance(mean, (int, float)):
-#         root = torch.randn(ntrees, 1, d, device=device) * std + mean
-#     else:
-#         # mean is tensor (d,)
-#         mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
-#         root = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
+def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, std = 0.1, device='cuda'):
+    X = X.to(device)
+    Y = Y.to(device)
+    if isinstance(mean, (int, float)):
+        root = torch.randn(ntrees, 1, d, device=device) * std + mean
+    else:
+        # mean is tensor (d,)
+        mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
+        root = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
     
-#     intercept = root
+    intercept = root
     
-#     total_lines = ntrees * nlines
-#     x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
-#     y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
+    total_lines = ntrees * nlines
+    x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
+    y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
     
-#     theta = X[x_indices] - Y[y_indices]
-#     theta = theta / torch.sqrt(torch.sum(theta ** 2, dim=1, keepdim=True))
-#     theta = theta.reshape(ntrees, nlines, d)
+    theta = X[x_indices] - Y[y_indices]
+    theta = theta / torch.sqrt(torch.sum(theta ** 2, dim=1, keepdim=True))
+    theta = theta.reshape(ntrees, nlines, d)
     
-#     return theta, intercept
+    return theta, intercept
 def generate_momentum_projecting_tree_frames(X, Y, ntrees, nlines, d, 
                                            prev_theta=None, prev_distances=None,
                                            beta_max=0.9, delta=1e-3, eps_0=1e-6, alpha=0.75,
