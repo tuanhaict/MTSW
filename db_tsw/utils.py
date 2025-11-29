@@ -156,9 +156,27 @@ def generate_power_spherical_rpt_frames(X, Y, ntrees, nlines, d, mean=123, std=0
     base_theta = X[x_indices] - Y[y_indices]
     base_theta = base_theta / torch.norm(base_theta, dim=1, keepdim=True)
     
+    # Adaptive kappa strategies
+    mean_distance = torch.norm(X.mean(dim=0) - Y.mean(dim=0))
+    
+    # Strategy 1: Exponential concentration
+    # adaptive_kappa = kappa / torch.exp(-mean_distance)
+    
+    # Strategy 2: Inverse relationship
+    # adaptive_kappa = kappa / (mean_distance + 0.1)
+    
+    # Strategy 3: Sigmoid concentration
+    # adaptive_kappa = kappa * torch.sigmoid(5.0 / (mean_distance + 0.1))
+    
+    # Strategy 4: Power law concentration
+    adaptive_kappa = kappa * torch.pow(1 / (mean_distance + 0.1), 0.5)
+    
+    # Strategy 5: Logarithmic concentration
+    # adaptive_kappa = kappa * torch.log(1 / (mean_distance + 0.1) + 1)
+    
     ps = PowerSpherical(
         loc=base_theta,
-        scale=torch.full((total_lines,), kappa, device=device),
+        scale=torch.full((total_lines,), adaptive_kappa.item(), device=device),
     )
     theta = ps.rsample()
     
