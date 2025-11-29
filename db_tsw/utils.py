@@ -170,7 +170,7 @@ def generate_power_spherical_rpt_frames(X, Y, ntrees, nlines, d, mean=123, std=0
     
     # Strategy 4: Power law concentration
     if mean_distance < 0.03:
-        kappa = 1.0
+        return generate_trees_frames(ntrees, nlines, d, mean=mean, std=std, device=device, gen_mode='gaussian_raw')
     if (np.random.randint(1,10) < 5):
         print(f"Adaptive kappa: {kappa:.4f}")
         print(f"Mean distance between X and Y: {mean_distance:.4f}")    
