@@ -137,7 +137,7 @@ for k, title in enumerate(titles):
                 # print(f"Time taken for TWD orthogonal: {end_time - start_time:.4f} seconds")
             elif k == 4:
                 start_time = time.time()  # Start timing
-                theta_twd, intercept_twd = generate_random_projecting_tree_frames(
+                theta_twd, intercept_twd = generate_power_spherical_rpt_frames(
                     X=X,
                     Y=Y,
                     ntrees=int(args.L / args.n_lines),
@@ -145,7 +145,8 @@ for k, title in enumerate(titles):
                     d=X.shape[1],
                     mean=mean_X,
                     std=args.std,
-                    device='cuda'
+                    device='cuda',
+                    kappa=args.kappa
                 )  # orthogonal
                 loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
                 end_time = time.time()  # End timing

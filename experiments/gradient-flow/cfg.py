@@ -43,6 +43,11 @@ def parse_args():
         default=1e-3,
         help='TWD: learning rate of TWD modified methods')
     parser.add_argument(
+        '--kappa',
+        type=float,
+        default=1.0,
+        help='TWD: kappa parameter for power spherical RPT frames')
+    parser.add_argument(
         '--delta',
         type=float,
         default=50.,
