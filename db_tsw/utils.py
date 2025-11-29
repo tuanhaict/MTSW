@@ -184,3 +184,65 @@ def generate_power_spherical_rpt_frames(X, Y, ntrees, nlines, d, mean=123, std=0
     theta = ps.rsample()
     
     return theta.reshape(ntrees, nlines, d), intercept
+def generate_rational_gate_tree_frames(
+    X, Y, ntrees, nlines, d,
+    mean=123, std=0.1, device='cuda',
+    rs=None,          # scale parameter for rational gate
+    eps=1e-8
+):
+    """
+    Generate (theta, intercept) for Tree-SW using:
+        theta = normalize( (1 - w(r))*u + w(r)*mu )
+    with rational gate:
+        w(r) = r / (r + rs)
+
+    - Ensures w(0) = 0  -> theta ~ uniform when x ≈ y
+    - Ensures w(r)→1   -> theta ≈ mu when x far from y
+    - No need for large κ, avoids numerical instability.
+    """
+
+    X = X.to(device)
+    Y = Y.to(device)
+
+    # ======= intercept (same as your original code) =======
+    if isinstance(mean, (int, float)):
+        root = torch.randn(ntrees, 1, d, device=device) * std + mean
+    else:
+        mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
+        root = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
+    intercept = root
+
+    # ======= sample pairs =======
+    total = ntrees * nlines
+    x_idx = np.random.choice(X.shape[0], total, replace=True)
+    y_idx = np.random.choice(Y.shape[0], total, replace=True)
+
+    x_sel = X[x_idx]           # (total, d)
+    y_sel = Y[y_idx]           # (total, d)
+    diff = x_sel - y_sel       # (total, d)
+
+    # ======= compute r and mu =======
+    norms = torch.sqrt(torch.sum(diff**2, dim=1, keepdim=True)).clamp_min(eps)  # (total,1)
+    r = norms.view(-1)  # (total,)
+    mu = diff / norms   # (total, d)
+
+    # ======= rational gate w(r) = r / (r + rs) =======
+    if rs is None:
+        # rs = median distance (robust, auto-scaling)
+        rs = float(torch.median(r).cpu().item() + eps)
+
+    w = r / (r + rs)    # (total,)
+    w = w.to(device)
+    w_col = w.view(-1, 1)
+
+    # ======= sample u ~ Uniform(S^{d-1}) via Gaussian normalize =======
+    normal = torch.randn(total, d, device=device)
+    normal = normal / torch.sqrt(torch.sum(normal**2, dim=1, keepdim=True)).clamp_min(eps)
+
+    # ======= convex combination & normalization =======
+    z = (1.0 - w_col) * normal + w_col * mu
+    z = z / torch.sqrt(torch.sum(z**2, dim=1, keepdim=True)).clamp_min(eps)
+
+    theta = z.reshape(ntrees, nlines, d)
+
+    return theta, intercept

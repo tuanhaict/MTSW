@@ -9,7 +9,7 @@ import pickle
 
 from core.utils_GF import load_data, w2
 import core.gradient_flow as gradient_flow
-from db_tsw.utils import generate_momentum_projecting_tree_frames, generate_power_spherical_rpt_frames, generate_random_projecting_tree_frames, generate_trees_frames
+from db_tsw.utils import generate_momentum_projecting_tree_frames, generate_power_spherical_rpt_frames, generate_random_projecting_tree_frames, generate_rational_gate_tree_frames, generate_trees_frames
 import cfg
 args = cfg.parse_args()
 from tqdm import tqdm
@@ -18,7 +18,7 @@ dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
 modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-RPT"]
+titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-RPT", "TSW-SL-RGT"]
 colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown', 'pink', 'gray']
 # Arrays to store results
 results = {}
@@ -145,6 +145,20 @@ for k, title in enumerate(titles):
                     std=args.std,
                     device='cuda',
                     kappa=args.kappa
+                )  # orthogonal
+                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
+                end_time = time.time()  # End timing
+            elif k == 5:
+                start_time = time.time()  # Start timing
+                theta_twd, intercept_twd = generate_rational_gate_tree_frames(
+                    X=X,
+                    Y=Y,
+                    ntrees=int(args.L / args.n_lines),
+                    nlines=args.n_lines,
+                    d=X.shape[1],
+                    mean=mean_X,
+                    std=args.std,
+                    device='cuda'
                 )  # orthogonal
                 loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
                 end_time = time.time()  # End timing
