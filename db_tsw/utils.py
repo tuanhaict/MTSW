@@ -60,6 +60,72 @@ def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, st
     theta = theta.reshape(ntrees, nlines, d)
     
     return theta, intercept
+def generate_adaptive_projecting_tree_frames(X, Y, ntrees, nlines, d, 
+                                           prev_tsw=None, schedule_type='laplace',
+                                           mean=123, std=0.1, device='cuda'):
+    X = X.to(device)
+    Y = Y.to(device)
+    
+    # Compute TSW-based SNR if previous TSW is provided
+    if prev_tsw is not None:
+        # Estimate projection variance from current data
+        sample_indices = torch.randint(0, min(X.shape[0], Y.shape[0]), (100,), device=device)
+        sample_diffs = X[sample_indices] - Y[sample_indices]
+        proj_var = torch.var(sample_diffs, dim=0).mean()
+        
+        snr_tsw = prev_tsw**2 / (proj_var + 1e-8)
+        log_snr = torch.log(snr_tsw + 1e-8)
+    else:
+        # Fallback to mean-based SNR for first iteration
+        mean_diff = torch.norm(X.mean(0) - Y.mean(0))**2
+        total_var = X.var() + Y.var()
+        snr_tsw = mean_diff / (total_var + 1e-8)
+        log_snr = torch.log(snr_tsw + 1e-8)
+    
+    # Compute adaptive weight based on schedule
+    if schedule_type == 'laplace':
+        w = torch.exp(-torch.abs(log_snr) / 0.5)
+    elif schedule_type == 'cauchy':
+        w = 1.0 / (torch.pi * (log_snr**2 + 1))
+    elif schedule_type == 'sech':
+        w = 1.0 / torch.cosh(log_snr)
+    else:
+        w = torch.tensor(0.5, device=device)  # default uniform mixing
+    
+    # Clamp weight to reasonable range
+    w = torch.clamp(w, 0.01, 0.99)
+    
+    # Generate tree intercepts (unchanged)
+    if isinstance(mean, (int, float)):
+        root = torch.randn(ntrees, 1, d, device=device) * std + mean
+    else:
+        mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
+        root = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
+    
+    intercept = root
+    
+    # Generate adaptive projections
+    total_lines = ntrees * nlines
+    x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
+    y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
+    
+    # Signal directions (X-Y normalized)
+    signal_dirs = X[x_indices] - Y[y_indices]
+    signal_dirs = signal_dirs / torch.sqrt(torch.sum(signal_dirs ** 2, dim=1, keepdim=True))
+    
+    # Random uniform directions
+    random_dirs = torch.randn(total_lines, d, device=device)
+    random_dirs = random_dirs / torch.sqrt(torch.sum(random_dirs ** 2, dim=1, keepdim=True))
+    
+    # Adaptive combination
+    sqrt_w = torch.sqrt(w)
+    sqrt_1_minus_w = torch.sqrt(1 - w)
+    
+    theta = sqrt_w * signal_dirs + sqrt_1_minus_w * random_dirs
+    theta = theta / torch.sqrt(torch.sum(theta ** 2, dim=1, keepdim=True))
+    theta = theta.reshape(ntrees, nlines, d)
+    print("Adaptive weight w:", w.item())
+    return theta, intercept
 def generate_momentum_projecting_tree_frames(X, Y, ntrees, nlines, d, 
                                            prev_theta=None, prev_distances=None,
                                            beta_max=0.9, delta=1e-3, eps_0=1e-6, alpha=0.75,

@@ -9,7 +9,7 @@ import pickle
 
 from core.utils_GF import load_data, w2
 import core.gradient_flow as gradient_flow
-from db_tsw.utils import RationalGateTreeFrameGenerator, generate_momentum_projecting_tree_frames, generate_power_spherical_rpt_frames, generate_random_projecting_tree_frames, generate_rational_gate_tree_frames, generate_trees_frames
+from db_tsw.utils import RationalGateTreeFrameGenerator, generate_adaptive_projecting_tree_frames, generate_momentum_projecting_tree_frames, generate_power_spherical_rpt_frames, generate_random_projecting_tree_frames, generate_rational_gate_tree_frames, generate_trees_frames
 import cfg
 args = cfg.parse_args()
 from tqdm import tqdm
@@ -45,6 +45,7 @@ for k, title in enumerate(titles):
         _, d = X.shape
         prev_theta = None
         prev_distances = None
+        prev_tsw = None
         # Construct folder name based on hyperparameters
         gen = RationalGateTreeFrameGenerator(num_iter=args.num_iter, schedule='exp', device='cuda')
 
@@ -152,11 +153,20 @@ for k, title in enumerate(titles):
                 end_time = time.time()  # End timing
             elif k == 5:
                 start_time = time.time()  # Start timing
-                theta_twd, intercept_twd,w = gen.generate(X= X, Y=Y, ntrees=int(args.L / args.n_lines), nlines=args.n_lines, d=X.shape[1], mean=mean_X, std=args.std, device='cuda', return_w=True)  # rational gate
-                if (t % 100 == 0):
-                    print(f"Rational Gate Weights at iteration {t}: {w.detach().cpu().numpy()}")
-                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
-                end_time = time.time()  # End timing
+                theta_twd, intercept_twd = generate_adaptive_projecting_tree_frames(
+                    X=X,
+                    Y=Y,
+                    ntrees=int(args.L / args.n_lines),
+                    nlines=args.n_lines,
+                    d=X.shape[1],
+                    mean=mean_X,
+                    std=args.std,
+                    device='cuda',
+                    prev_tsw=prev_tsw,
+                )  # orthogonal
+                prev_tsw= gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
+                loss += prev_tsw
+                end_time = time.time()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
