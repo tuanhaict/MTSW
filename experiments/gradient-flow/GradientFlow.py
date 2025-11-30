@@ -83,7 +83,7 @@ for k, title in enumerate(titles):
 
         for t in tqdm(range(nofiterations)):
             theta = torch.ones(len(modes), d)
-
+            gen.step(1)
             loss = 0
 
             if k == 0:
