@@ -70,6 +70,7 @@ def generate_adaptive_projecting_tree_frames(X, Y, ntrees, nlines, d,
     if prev_tsw is not None:
         # Estimate projection variance from current data
         prev_tsw = prev_tsw.detach()
+        print("Previous TSW:", prev_tsw.item())
         sample_indices = torch.randint(0, min(X.shape[0], Y.shape[0]), (100,), device=device)
         sample_diffs = X[sample_indices] - Y[sample_indices]
         proj_var = torch.var(sample_diffs, dim=0).mean()
