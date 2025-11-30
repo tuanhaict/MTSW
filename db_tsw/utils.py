@@ -171,9 +171,6 @@ def generate_power_spherical_rpt_frames(X, Y, ntrees, nlines, d, mean=123, std=0
     # Strategy 4: Power law concentration
     if mean_distance < 0.05:
         return generate_trees_frames(ntrees, nlines, d, mean=mean, std=std, device=device, gen_mode='gaussian_orthogonal')
-    if (np.random.randint(1,10) < 5):
-        print(f"Adaptive kappa: {kappa:.4f}")
-        print(f"Mean distance between X and Y: {mean_distance:.4f}")    
     # Strategy 5: Logarithmic concentration
     # adaptive_kappa = kappa * torch.log(1 / (mean_distance + 0.1) + 1)
     
