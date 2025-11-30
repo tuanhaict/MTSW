@@ -52,8 +52,8 @@ def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, st
     intercept = root
     if prev_tsw is not None:
         prev_tsw = prev_tsw.detach()
-    if prev_tsw <= 0.03:
-        return generate_trees_frames(ntrees, nlines, d, mean=mean, std=std, device=device, gen_mode='gaussian_raw')
+        if prev_tsw <= 0.03:
+            return generate_trees_frames(ntrees, nlines, d, mean=mean, std=std, device=device, gen_mode='gaussian_raw')
     total_lines = ntrees * nlines
     x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
     y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
