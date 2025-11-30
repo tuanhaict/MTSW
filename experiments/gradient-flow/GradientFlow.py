@@ -154,7 +154,7 @@ for k, title in enumerate(titles):
                 start_time = time.time()  # Start timing
                 theta_twd, intercept_twd,w = gen.generate(X= X, Y=Y, ntrees=int(args.L / args.n_lines), nlines=args.n_lines, d=X.shape[1], mean=mean_X, std=args.std, device='cuda', return_w=True)  # rational gate
                 if (t % 100 == 0):
-                    print(f"Rational Gate Weights at iteration {t}: {w.cpu().numpy()}")
+                    print(f"Rational Gate Weights at iteration {t}: {w.detach().cpu().numpy()}")
                 loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
                 end_time = time.time()  # End timing
             optimizer.zero_grad()
