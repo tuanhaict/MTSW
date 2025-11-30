@@ -18,9 +18,8 @@ dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
 modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-# titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-RPT", "TSW-SL-RGT"]
+titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-RPT", "TSW-SL-RGT"]
 colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown', 'pink', 'gray']
-titles = ["TSW-SL-RGT"]
 # Arrays to store results
 results = {}
 for title in titles:
