@@ -75,6 +75,7 @@ def generate_adaptive_projecting_tree_frames(X, Y, ntrees, nlines, d,
         proj_var = torch.var(sample_diffs, dim=0).mean()
         
         snr_tsw = prev_tsw**2 / (proj_var + 1e-8)
+        print("SNR TSW:", snr_tsw.item())
         log_snr = torch.log(snr_tsw + 1e-8)
     else:
         # Fallback to mean-based SNR for first iteration
@@ -82,7 +83,7 @@ def generate_adaptive_projecting_tree_frames(X, Y, ntrees, nlines, d,
         total_var = X.var() + Y.var()
         snr_tsw = mean_diff / (total_var + 1e-8)
         log_snr = torch.log(snr_tsw + 1e-8)
-    
+    print("Log SNR:", log_snr.item())
     # Compute adaptive weight based on schedule
     if schedule_type == 'laplace':
         w = torch.exp(-torch.abs(log_snr) / 0.5)

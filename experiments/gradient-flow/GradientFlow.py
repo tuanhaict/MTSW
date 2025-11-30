@@ -18,8 +18,9 @@ dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
 modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-RPT", "TSW-SL-RGT"]
+# titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-RPT", "TSW-SL-RGT"]
 colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown', 'pink', 'gray']
+titles = ["TSW-SL-RGT"]
 # Arrays to store results
 results = {}
 for title in titles:
@@ -88,10 +89,25 @@ for k, title in enumerate(titles):
             loss = 0
 
             if k == 0:
-                start_time = time.time()  # Start timing
-                loss += gsw_res.sw(X.to(device), Y, theta=None)
-                end_time = time.time()  # End timing
+                # start_time = time.time()  # Start timing
+                # loss += gsw_res.sw(X.to(device), Y, theta=None)
+                # end_time = time.time()  # End timing
                 # print(f"Time taken for SW: {end_time - start_time:.4f} seconds")
+                start_time = time.time()  # Start timing
+                theta_twd, intercept_twd = generate_adaptive_projecting_tree_frames(
+                    X=X,
+                    Y=Y,
+                    ntrees=int(args.L / args.n_lines),
+                    nlines=args.n_lines,
+                    d=X.shape[1],
+                    mean=mean_X,
+                    std=args.std,
+                    device='cuda',
+                    prev_tsw=prev_tsw,
+                )  # orthogonal
+                prev_tsw= gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
+                loss += prev_tsw
+                end_time = time.time()
             elif k == 1:
                 start_time = time.time()  # Start timing
                 theta_twd, intercept_twd = generate_trees_frames(
