@@ -89,25 +89,10 @@ for k, title in enumerate(titles):
             loss = 0
 
             if k == 0:
-                # start_time = time.time()  # Start timing
-                # loss += gsw_res.sw(X.to(device), Y, theta=None)
-                # end_time = time.time()  # End timing
-                # print(f"Time taken for SW: {end_time - start_time:.4f} seconds")
                 start_time = time.time()  # Start timing
-                theta_twd, intercept_twd = generate_adaptive_projecting_tree_frames(
-                    X=X,
-                    Y=Y,
-                    ntrees=int(args.L / args.n_lines),
-                    nlines=args.n_lines,
-                    d=X.shape[1],
-                    mean=mean_X,
-                    std=args.std,
-                    device='cuda',
-                    prev_tsw=prev_tsw,
-                )  # orthogonal
-                prev_tsw= gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
-                loss += prev_tsw
-                end_time = time.time()
+                loss += gsw_res.sw(X.to(device), Y, theta=None)
+                end_time = time.time()  # End timing
+                # print(f"Time taken for SW: {end_time - start_time:.4f} seconds")
             elif k == 1:
                 start_time = time.time()  # Start timing
                 theta_twd, intercept_twd = generate_trees_frames(
@@ -169,7 +154,7 @@ for k, title in enumerate(titles):
                 end_time = time.time()  # End timing
             elif k == 5:
                 start_time = time.time()  # Start timing
-                theta_twd, intercept_twd = generate_adaptive_projecting_tree_frames(
+                theta_twd, intercept_twd = generate_random_projecting_tree_frames(
                     X=X,
                     Y=Y,
                     ntrees=int(args.L / args.n_lines),

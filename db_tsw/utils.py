@@ -39,7 +39,7 @@ def generate_trees_frames(ntrees, nlines, d, mean=128, std=0.1, device='cuda', g
     
     return theta, intercept
 
-def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, std = 0.1, device='cuda'):
+def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, std = 0.1, device='cuda', prev_tsw=None):
     X = X.to(device)
     Y = Y.to(device)
     if isinstance(mean, (int, float)):
@@ -50,7 +50,10 @@ def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, st
         root = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
     
     intercept = root
-    
+    if prev_tsw is not None:
+        prev_tsw = prev_tsw.detach()
+    if prev_tsw <= 0.03:
+        return generate_trees_frames(ntrees, nlines, d, mean=mean, std=std, device=device, gen_mode='gaussian_raw')
     total_lines = ntrees * nlines
     x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
     y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
