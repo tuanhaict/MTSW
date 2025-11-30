@@ -66,39 +66,56 @@ def generate_adaptive_projecting_tree_frames(X, Y, ntrees, nlines, d,
     X = X.to(device)
     Y = Y.to(device)
     
-    # Compute TSW-based SNR if previous TSW is provided
+    # Compute adaptive weight directly from TSW value
     if prev_tsw is not None:
-        # Estimate projection variance from current data
         prev_tsw = prev_tsw.detach()
-        print("Previous TSW:", prev_tsw.item())
-        sample_indices = torch.randint(0, min(X.shape[0], Y.shape[0]), (100,), device=device)
-        sample_diffs = X[sample_indices] - Y[sample_indices]
-        proj_var = torch.var(sample_diffs, dim=0).mean()
         
-        snr_tsw = prev_tsw**2 / (proj_var + 1e-8)
-        print("SNR TSW:", snr_tsw.item())
-        log_snr = torch.log(snr_tsw + 1e-8)
+        # Define convergence threshold (when TSW is considered "converged")
+        convergence_threshold = 0.02  # Adjust based on your problem
+        
+        # Normalize TSW to [0, 1] range where 1 = far from convergence, 0 = converged
+        normalized_tsw = torch.clamp(prev_tsw / convergence_threshold, 0.0, 1.0)
+        
+        # Compute adaptive weight based on schedule
+        if schedule_type == 'laplace':
+            # w = exp(-|log(normalized_tsw)|/b)
+            # When normalized_tsw = 1 → log ≈ 0 → w ≈ 1
+            # When normalized_tsw → 0 → log → -∞ → w → 0
+            log_norm_tsw = torch.log(normalized_tsw + 1e-8)
+            w = torch.exp(-torch.abs(log_norm_tsw) / 1.0)
+            
+        elif schedule_type == 'cauchy':
+            # w = 1 / (1 + (shift - log(normalized_tsw))^2)
+            log_norm_tsw = torch.log(normalized_tsw + 1e-8)
+            w = 1.0 / (1.0 + (log_norm_tsw + 2.0)**2)  # shift = -2
+            
+        elif schedule_type == 'sech':
+            # w = sech(log(normalized_tsw))
+            log_norm_tsw = torch.log(normalized_tsw + 1e-8)
+            w = 1.0 / torch.cosh(-log_norm_tsw)
+            
+        elif schedule_type == 'sigmoid':
+            # Smooth transition: w = sigmoid(k * (TSW - threshold))
+            k = 10.0  # steepness
+            transition_point = 0.05  # TSW value where w = 0.5
+            w = torch.sigmoid(k * (prev_tsw - transition_point))
+            
+        else:  # linear
+            w = normalized_tsw
+            
+        print(f"Previous TSW: {prev_tsw.item():.6f}")
+        print(f"Normalized TSW: {normalized_tsw.item():.6f}")
+        print(f"Adaptive weight w: {w.item():.6f}")
+        
     else:
-        # Fallback to mean-based SNR for first iteration
-        mean_diff = torch.norm(X.mean(0) - Y.mean(0))**2
-        total_var = X.var() + Y.var()
-        snr_tsw = mean_diff / (total_var + 1e-8)
-        log_snr = torch.log(snr_tsw + 1e-8)
-    print("Log SNR:", log_snr.item())
-    # Compute adaptive weight based on schedule
-    if schedule_type == 'laplace':
-        w = torch.exp(-torch.abs(log_snr) / 0.5)
-    elif schedule_type == 'cauchy':
-        w = 1.0 / (torch.pi * (log_snr**2 + 1))
-    elif schedule_type == 'sech':
-        w = 1.0 / torch.cosh(log_snr)
-    else:
-        w = torch.tensor(0.5, device=device)  # default uniform mixing
+        # First iteration: assume far from convergence
+        w = torch.tensor(0.9, device=device)
+        print(f"Initial weight w: {w.item():.6f}")
     
-    # Clamp weight to reasonable range
-    w = torch.clamp(w, 0.01, 0.99)
+    # No clamping needed - natural range should be [0,1]
+    w = torch.clamp(w, 0.01, 0.99)  # Keep minimal clamp for numerical stability
     
-    # Generate tree intercepts (unchanged)
+    # Generate tree intercepts
     if isinstance(mean, (int, float)):
         root = torch.randn(ntrees, 1, d, device=device) * std + mean
     else:
@@ -127,7 +144,7 @@ def generate_adaptive_projecting_tree_frames(X, Y, ntrees, nlines, d,
     theta = sqrt_w * signal_dirs + sqrt_1_minus_w * random_dirs
     theta = theta / torch.sqrt(torch.sum(theta ** 2, dim=1, keepdim=True))
     theta = theta.reshape(ntrees, nlines, d)
-    print("Adaptive weight w:", w.item())
+    
     return theta, intercept
 def generate_momentum_projecting_tree_frames(X, Y, ntrees, nlines, d, 
                                            prev_theta=None, prev_distances=None,
