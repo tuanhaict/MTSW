@@ -92,7 +92,7 @@ def generate_hungarian_projecting_tree_frames(
     Yp = Y[idxY]
 
     # distance matrix (CPU để dùng scipy)
-    dist = torch.cdist(Xp, Yp, p=2).cpu().numpy()  # (n,n)
+    dist = torch.cdist(Xp, Yp, p=2).detach().cpu().numpy()  # (n,n)
 
     row_ind, col_ind = linear_sum_assignment(dist)
 
