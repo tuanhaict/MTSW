@@ -3,6 +3,7 @@ import time
 import numpy as np
 from .von_mises_fisher import VonMisesFisher
 from .power_spherical import PowerSpherical
+from scipy.optimize import linear_sum_assignment
 def svd_orthogonalize(matrix):
     U, _, _ = torch.linalg.svd(matrix, full_matrices=False)
     return U
@@ -63,6 +64,54 @@ def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, st
     theta = theta.reshape(ntrees, nlines, d)
     
     return theta, intercept
+
+def generate_hungarian_projecting_tree_frames(
+    X, Y, ntrees, nlines, d,
+    mean=123, std=0.1, device='cuda',
+    eps=1e-8
+):
+    X = X.to(device)
+    Y = Y.to(device)
+
+    # ===== intercept =====
+    if isinstance(mean, (int, float)):
+        intercept = torch.randn(ntrees, 1, d, device=device) * std + mean
+    else:
+        mean_tensor = mean.to(device)
+        intercept = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
+
+    total = ntrees * nlines
+
+    # ===== Hungarian matching giữa X và Y =====
+    # nếu size khác nhau thì sample lại cho bằng nhau
+    n = min(X.shape[0], Y.shape[0])
+    idxX = np.random.choice(X.shape[0], n, replace=False)
+    idxY = np.random.choice(Y.shape[0], n, replace=False)
+
+    Xp = X[idxX]  # (n,d)
+    Yp = Y[idxY]
+
+    # distance matrix (CPU để dùng scipy)
+    dist = torch.cdist(Xp, Yp, p=2).cpu().numpy()  # (n,n)
+
+    row_ind, col_ind = linear_sum_assignment(dist)
+
+    # cắt hoặc lặp lại nếu không đủ total
+    if n < total:
+        rep = total // n + 1
+        row_ind = np.tile(row_ind, rep)[:total]
+        col_ind = np.tile(col_ind, rep)[:total]
+    else:
+        row_ind = row_ind[:total]
+        col_ind = col_ind[:total]
+
+    # ===== tạo hướng =====
+    diff = Xp[row_ind] - Yp[col_ind]          # (total, d)
+    diff_norm = torch.norm(diff, dim=1, keepdim=True).clamp_min(eps)
+    theta = (diff / diff_norm).reshape(ntrees, nlines, d)
+
+    return theta, intercept
+
 def generate_adaptive_projecting_tree_frames(X, Y, ntrees, nlines, d, 
                                            prev_tsw=None, schedule_type='laplace',
                                            mean=123, std=0.1, device='cuda'):
