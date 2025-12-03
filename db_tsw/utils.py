@@ -39,7 +39,7 @@ def generate_trees_frames(ntrees, nlines, d, mean=128, std=0.1, device='cuda', g
         theta = theta.transpose(-2, -1)
     
     return theta, intercept
-def estimate_sw_1d_from_random_pairs(X, Y, n_pairs=8, device=None):
+def estimate_sw_1d_from_random_pairs(X, Y, n_pairs=4, device=None):
     if device is None:
         device = X.device
 
@@ -77,7 +77,7 @@ def estimate_sw_1d_from_random_pairs(X, Y, n_pairs=8, device=None):
 def generate_random_projecting_tree_frames(
     X, Y, ntrees, nlines, d, mean=123, std=0.1,
     device='cuda',
-    w_scale=0.05, n_pairs_for_d=4
+    w_scale=0.1, n_pairs_for_d=4
 ):
 
     X = X.to(device)
@@ -90,7 +90,7 @@ def generate_random_projecting_tree_frames(
         )  
     if w_scale <= 0:
         raise ValueError("w_scale must be positive.")
-    w = 1.0 - torch.exp(- (d_est / w_scale) ** 50)
+    w = 1.0 - torch.exp(- (d_est / w_scale) ** 100)
     w = torch.clamp(w, 0.0, 1.0)
     w_float = float(w.item()) 
 
