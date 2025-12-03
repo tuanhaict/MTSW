@@ -161,10 +161,8 @@ for k, title in enumerate(titles):
                     mean=mean_X,
                     std=args.std,
                     device='cuda',
-                    prev_tsw=prev_tsw,
                 )  # orthogonal
-                prev_tsw= gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
-                loss += prev_tsw
+                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
                 end_time = time.time()
             optimizer.zero_grad()
             loss.backward()

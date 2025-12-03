@@ -39,30 +39,87 @@ def generate_trees_frames(ntrees, nlines, d, mean=128, std=0.1, device='cuda', g
         theta = theta.transpose(-2, -1)
     
     return theta, intercept
+def estimate_sw_1d_from_random_pairs(X, Y, n_pairs=8, device=None):
+    if device is None:
+        device = X.device
 
-def generate_random_projecting_tree_frames(X, Y, ntrees, nlines, d, mean=123, std = 0.1, device='cuda', prev_tsw=None):
+    N_x, d_dim = X.shape
+    N_y = Y.shape[0]
+
+    d_list = []
+
+    for _ in range(n_pairs):
+        ix = torch.randint(0, N_x, (1,), device=device)
+        iy = torch.randint(0, N_y, (1,), device=device)
+
+        diff = X[ix] - Y[iy]       
+        diff = diff.view(-1)        
+        norm = torch.norm(diff)
+        if norm < 1e-8:
+            continue
+
+        theta = diff / norm         # (d,)
+        X_proj = X @ theta          # (N_x,)
+        Y_proj = Y @ theta          # (N_y,)
+
+        X_sorted, _ = torch.sort(X_proj)
+        Y_sorted, _ = torch.sort(Y_proj)
+
+        n = min(X_sorted.shape[0], Y_sorted.shape[0])
+        d_1d = torch.mean(torch.abs(X_sorted[:n] - Y_sorted[:n]))
+        d_list.append(d_1d)
+
+    if len(d_list) == 0:
+        return torch.tensor(0.0, device=device)
+
+    d_est = torch.stack(d_list).mean()  # scalar tensor
+    return d_est
+def generate_random_projecting_tree_frames(
+    X, Y, ntrees, nlines, d, mean=123, std=0.1,
+    device='cuda',
+    w_scale=0.05, n_pairs_for_d=4
+):
+
     X = X.to(device)
     Y = Y.to(device)
+
+    dim = d 
+    with torch.no_grad():
+        d_est = estimate_sw_1d_from_random_pairs(
+            X, Y, n_pairs=n_pairs_for_d, device=device
+        )  
+    if w_scale <= 0:
+        raise ValueError("w_scale must be positive.")
+    w = 1.0 - torch.exp(- (d_est / w_scale) ** 3)
+    w = torch.clamp(w, 0.0, 1.0)
+    w_float = float(w.item()) 
+
     if isinstance(mean, (int, float)):
-        root = torch.randn(ntrees, 1, d, device=device) * std + mean
+        root = torch.randn(ntrees, 1, dim, device=device) * std + mean
     else:
-        # mean is tensor (d,)
         mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
-        root = torch.randn(ntrees, 1, d, device=device) * std + mean_tensor.view(1, 1, d)
-    
+        root = torch.randn(ntrees, 1, dim, device=device) * std + mean_tensor.view(1, 1, dim)
+
     intercept = root
-    if prev_tsw is not None:
-        prev_tsw = prev_tsw.detach()
-        if prev_tsw <= 0.03:
-            return generate_trees_frames(ntrees, nlines, d, mean=mean, std=std, device=device, gen_mode='gaussian_raw')
+
     total_lines = ntrees * nlines
     x_indices = np.random.choice(X.shape[0], total_lines, replace=True)
     y_indices = np.random.choice(Y.shape[0], total_lines, replace=True)
-    
-    theta = X[x_indices] - Y[y_indices]
-    theta = theta / torch.sqrt(torch.sum(theta ** 2, dim=1, keepdim=True))
-    theta = theta.reshape(ntrees, nlines, d)
-    
+
+    diff_xy = X[x_indices] - Y[y_indices]
+    diff_norm = torch.norm(diff_xy, dim=1, keepdim=True) + 1e-8
+    diff_dir = diff_xy / diff_norm 
+
+    u = torch.randn_like(diff_dir)
+    u_norm = torch.norm(u, dim=1, keepdim=True) + 1e-8
+    u_dir = u / u_norm
+
+    theta = w_float * diff_dir + (1.0 - w_float) * u_dir
+
+    theta_norm = torch.norm(theta, dim=1, keepdim=True) + 1e-8
+    theta = theta / theta_norm
+    theta = theta.view(ntrees, nlines, dim)
+
     return theta, intercept
 
 def generate_hungarian_projecting_tree_frames(
