@@ -90,7 +90,7 @@ def generate_random_projecting_tree_frames(
         )  
     if w_scale <= 0:
         raise ValueError("w_scale must be positive.")
-    w = 1.0 - torch.exp(- (d_est / w_scale) ** 3)
+    w = 1.0 - torch.exp(- (d_est / w_scale) ** 50)
     w = torch.clamp(w, 0.0, 1.0)
     w_float = float(w.item()) 
 
