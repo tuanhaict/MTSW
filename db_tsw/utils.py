@@ -74,6 +74,33 @@ def estimate_sw_1d_from_random_pairs(X, Y, n_pairs=4, device=None):
 
     d_est = torch.stack(d_list).mean()  # scalar tensor
     return d_est
+def generate_adaptive_root(X, Y, ntrees, d, std=0.1, w=None, d_est=None, device='cuda'):
+    mean_X = torch.mean(X, dim=0, keepdim=True)
+    mean_Y = torch.mean(Y, dim=0, keepdim=True)
+    
+    if w is None:
+        if d_est is None:
+            d_est = torch.norm(mean_X - mean_Y)
+        else:
+            d_est = float(d_est) if isinstance(d_est, torch.Tensor) else d_est
+        w = torch.tensor(d_est / (d_est + 1.0), device=device)  # simple schedule
+    
+    # Adaptive root along principal direction
+    midpoint = 0.5 * (mean_X + mean_Y)
+    direction = mean_X - mean_Y
+    direction_norm = torch.norm(direction)
+    
+    if direction_norm > 1e-8:
+        direction_unit = direction / direction_norm
+        d_est_val = d_est if d_est is not None else direction_norm
+        base_root = midpoint + w * (d_est_val / 2) * direction_unit
+    else:
+        base_root = midpoint
+    
+    # Add noise
+    root = torch.randn(ntrees, 1, d, device=device) * std + base_root.view(1, 1, d)
+    
+    return root
 def generate_random_projecting_tree_frames(
     X, Y, ntrees, nlines, d, mean=123, std=0.1,
     device='cuda',
@@ -94,12 +121,12 @@ def generate_random_projecting_tree_frames(
     w = torch.clamp(w, 0.0, 1.0)
     w_float = float(w.item()) 
 
-    if isinstance(mean, (int, float)):
-        root = torch.randn(ntrees, 1, dim, device=device) * std + mean
-    else:
-        mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
-        root = torch.randn(ntrees, 1, dim, device=device) * std + mean_tensor.view(1, 1, dim)
-
+    # if isinstance(mean, (int, float)):
+    #     root = torch.randn(ntrees, 1, dim, device=device) * std + mean
+    # else:
+    #     mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
+    #     root = torch.randn(ntrees, 1, dim, device=device) * std + mean_tensor.view(1, 1, dim)
+    root = generate_adaptive_root(X, Y, ntrees, dim, std=std, w=w, d_est=d_est, device=device)
     intercept = root
 
     total_lines = ntrees * nlines
