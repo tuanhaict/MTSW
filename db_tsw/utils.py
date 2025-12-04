@@ -104,6 +104,7 @@ def generate_adaptive_root(X, Y, ntrees, d, std=0.1, w=None, d_est=None, device=
 def generate_random_projecting_tree_frames(
     X, Y, ntrees, nlines, d, mean=123, std=0.1,
     device='cuda',
+    root_mode='adaptive',  # 'adaptive' | 'random'
     w_scale=0.1, n_pairs_for_d=4
 ):
 
@@ -120,13 +121,14 @@ def generate_random_projecting_tree_frames(
     w = 1.0 - torch.exp(- (d_est / w_scale) ** 100)
     w = torch.clamp(w, 0.0, 1.0)
     w_float = float(w.item()) 
-
-    # if isinstance(mean, (int, float)):
-    #     root = torch.randn(ntrees, 1, dim, device=device) * std + mean
-    # else:
-    #     mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
-    #     root = torch.randn(ntrees, 1, dim, device=device) * std + mean_tensor.view(1, 1, dim)
-    root = generate_adaptive_root(X, Y, ntrees, dim, std=std, w=w, d_est=d_est, device=device)
+    if root_mode == 'random':
+        if isinstance(mean, (int, float)):
+            root = torch.randn(ntrees, 1, dim, device=device) * std + mean
+        else:
+            mean_tensor = mean.to(device) if mean.device != torch.device(device) else mean
+            root = torch.randn(ntrees, 1, dim, device=device) * std + mean_tensor.view(1, 1, dim)
+    else:  # adaptive
+        root = generate_adaptive_root(X, Y, ntrees, dim, std=std, w=w, d_est=d_est, device=device)
     intercept = root
 
     total_lines = ntrees * nlines
