@@ -17,8 +17,8 @@ class TWConcurrentLines():
         self.delta = delta
         self.mass_division = mass_division
 
-        assert self.mass_division in ['uniform', 'distance_based', 'balanced_distance_based'], \
-            "Invalid mass division. Must be one of 'uniform', 'distance_based', 'balanced_distance_based'"
+        assert self.mass_division in ['uniform', 'distance_based', 'discrimination_based'], \
+            "Invalid mass division. Must be one of 'uniform', 'distance_based', 'discrimination_based'"
 
     def __call__(self, X, Y, theta, intercept):
         X = X.to(self.device)
@@ -72,18 +72,18 @@ class TWConcurrentLines():
     def get_mass_and_coordinate(self, X, Y, theta, intercept):
         N, dn = X.shape
         
-        if self.mass_division == 'balanced_distance_based':
-            # Concat X and Y for balanced distance computation
-            XY = torch.cat([X, Y], dim=0)  # (2N, d)
-            mass_XY, axis_coordinate_XY = self.project(XY, theta=theta, intercept=intercept)
-            
-            # Split back
-            mass_X = mass_XY[:, :, :N]
-            mass_Y = mass_XY[:, :, N:]
-            axis_coordinate_X = axis_coordinate_XY[:, :, :N]
-            axis_coordinate_Y = axis_coordinate_XY[:, :, N:]
+        # Compute discrimination scores ONCE per tree
+        if self.mass_division == 'discrimination_based':
+            discrimination_scores = self.compute_discrimination_mean_diff(X, Y, theta, intercept)
+            mass_X, axis_coordinate_X = self.project(
+                X, theta=theta, intercept=intercept, 
+                discrimination_scores=discrimination_scores
+            )
+            mass_Y, axis_coordinate_Y = self.project(
+                Y, theta=theta, intercept=intercept,
+                discrimination_scores=discrimination_scores
+            )
         else:
-            # Original: project X and Y separately
             mass_X, axis_coordinate_X = self.project(X, theta=theta, intercept=intercept)
             mass_Y, axis_coordinate_Y = self.project(Y, theta=theta, intercept=intercept)
         
@@ -91,36 +91,99 @@ class TWConcurrentLines():
         massXY = torch.cat((mass_X, -mass_Y), dim=2)
         
         return combined_axis_coordinate, massXY
+    def compute_discrimination_mean_diff(self, X, Y, theta, intercept):
+        """
+        Compute discrimination score per line based on mean difference.
+        
+        s(θᵢ) = |⟨μ_X - μ_Y, θᵢ⟩| + ε
+        
+        Args:
+            X: (N, d) source samples
+            Y: (M, d) target samples
+            theta: (num_trees, num_lines, d) projection directions (normalized)
+            intercept: (num_trees, 1, d) tree roots
+            
+        Returns:
+            discrimination_scores: (num_trees, num_lines)
+        """
+        # Compute means
+        mu_X = X.mean(dim=0)  # (d,)
+        mu_Y = Y.mean(dim=0)  # (d,)
+        
+        # Mean difference vector
+        diff = mu_X - mu_Y  # (d,)
+        
+        # Project difference onto each direction
+        # |⟨diff, θᵢ⟩| for each tree and line
+        scores = torch.abs(torch.einsum('d,tkd->tk', diff, theta))  # (T, k)
+        
+        # Add small noise to avoid zero discrimination
+        # This handles case when μ_X ≈ μ_Y or when θ ⊥ diff
+        epsilon = 1e-3 * torch.randn_like(scores).abs()  # small positive noise
+        scores = scores + epsilon
+        
+        return scores
 
-    def project(self, input, theta, intercept):
+    def project(self, input, theta, intercept, discrimination_scores=None):
+        """
+        Project points onto lines with optional discrimination-based weighting.
+        
+        Args:
+            input: (N, d) points to project
+            theta: (num_trees, num_lines, d) directions
+            intercept: (num_trees, 1, d) tree roots
+            discrimination_scores: (num_trees, num_lines) [optional]
+                If provided, use discrimination_based mass division
+        """
         N, d = input.shape
         num_trees = theta.shape[0]
         num_lines = theta.shape[1]
         
-        # all lines has the same point which is root
-        input_translated = (input - intercept) #[T,B,D]
-        # projected cordinate
-        # 'tld,tdb->tlb'
-        axis_coordinate = torch.matmul(theta, input_translated.transpose(1, 2))
+        # Translate to tree coordinate system
+        input_translated = input - intercept  # (T, N, d)
+        
+        # Project onto each line
+        axis_coordinate = torch.matmul(theta, input_translated.transpose(1, 2))  # (T, k, N)
         input_projected_translated = torch.einsum('tlb,tld->tlbd', axis_coordinate, theta)
         
+        # Compute mass allocation
         if self.mass_division == 'uniform':
             mass_input = torch.ones((num_trees, num_lines, N), device=self.device) / (N * num_lines)
-        elif self.mass_division =='distance_based':
-            dist = (torch.norm(input_projected_translated - input_translated.unsqueeze(1), dim = -1))
-            weight = -self.delta*dist
-            mass_input = torch.softmax(weight, dim=-2)/N
-        elif self.mass_division == 'balanced_distance_based':
-            dist = torch.norm(input_projected_translated - input_translated.unsqueeze(1), dim=-1)  # (T, k, N) where N could be 2N
-        
-            # Aggregate distance per line
-            avg_dist_per_line = dist.mean(dim=2)  # (T, k)
             
-            # Softmax over lines
-            mass_per_line = torch.softmax(-self.delta * avg_dist_per_line, dim=1)  # (T, k)
+        elif self.mass_division == 'distance_based':
+            # Geometric distance only
+            dist = torch.norm(input_projected_translated - input_translated.unsqueeze(1), dim=-1)
+            weight = -self.delta * dist
+            mass_input = torch.softmax(weight, dim=-2) / N
             
-            # Broadcast to all points
-            mass_input = mass_per_line.unsqueeze(2).expand(-1, -1, N) / N  # (T, k, N)
+        elif self.mass_division == 'discrimination_based':
+            assert discrimination_scores is not None, \
+                "discrimination_scores required for discrimination_based"
+            
+            # === Two-Stage Allocation ===
+            
+            # Stage 1: Global line weights from discrimination
+            # π(θᵢ) = softmax(β · s(θᵢ))
+            line_weights = torch.softmax(
+                self.delta * discrimination_scores,  # using delta as β
+                dim=1
+            )  # (T, k), sums to 1 over lines
+            
+            # Stage 2: Local geometric scores
+            # geometric_score = -δ · d(x, line)
+            dist = torch.norm(
+                input_projected_translated - input_translated.unsqueeze(1), 
+                dim=-1
+            )  # (T, k, N)
+            geometric_scores = -self.delta * dist  # (T, k, N)
+            
+            # Combine: log(π) + geometric_score
+            # This implements: α ∝ π(θᵢ) · exp(-δ · d(x, θᵢ))
+            log_line_weights = torch.log(line_weights + 1e-8).unsqueeze(2)  # (T, k, 1)
+            combined_scores = geometric_scores + log_line_weights  # (T, k, N)
+            
+            # Normalize: softmax over lines for each point
+            mass_input = torch.softmax(combined_scores, dim=1) / N  # (T, k, N)
         
         return mass_input, axis_coordinate
 
