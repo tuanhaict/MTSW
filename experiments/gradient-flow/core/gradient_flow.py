@@ -55,7 +55,7 @@ class GF():
 
         Xslices_sorted=torch.sort(Xslices,dim=0)[0]
         Yslices_sorted=torch.sort(Yslices,dim=0)[0]
-        wpsq_per_slice = torch.mean((Xslices_sorted - Yslices_sorted)**p, dim=0)  # (k,)
+        wpsq_per_slice = torch.mean(torch.abs(Xslices_sorted - Yslices_sorted)**p, dim=0)  # (k,)
 
         return torch.mean(wpsq_per_slice)**(1./p)
     
