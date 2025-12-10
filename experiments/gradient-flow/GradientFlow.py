@@ -115,7 +115,7 @@ for k, title in enumerate(titles):
                     ntrees=int(args.L / args.n_lines),
                     nlines=args.n_lines,
                     d=X.shape[1],
-                    mean=mean,
+                    mean=mean_X,
                     std=args.std,
                     gen_mode='gaussian_raw',
                     device='cuda'
