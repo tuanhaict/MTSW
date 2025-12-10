@@ -80,7 +80,9 @@ for k, title in enumerate(titles):
         # fig = pl.figure(figsize=(4 * s, 8 + 3))
 
         mean_X = torch.mean(X, dim=0, keepdim=True).to(device)
+        mean_Y = torch.mean(Y, dim=0, keepdim=True).to(device)
         std_X = torch.std(X, dim=0, keepdim=True).to(device)
+        mean = (mean_X + mean_Y) / 2.0
 
         for t in tqdm(range(nofiterations)):
             theta = torch.ones(len(modes), d)
@@ -113,7 +115,7 @@ for k, title in enumerate(titles):
                     ntrees=int(args.L / args.n_lines),
                     nlines=args.n_lines,
                     d=X.shape[1],
-                    mean=mean_X,
+                    mean=mean,
                     std=args.std,
                     gen_mode='gaussian_raw',
                     device='cuda'
