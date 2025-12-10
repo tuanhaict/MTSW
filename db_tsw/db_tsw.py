@@ -165,26 +165,25 @@ class TWConcurrentLines():
             # Stage 1: Global line weights from discrimination
             # π(θᵢ) = softmax(β · s(θᵢ))
             line_weights = torch.softmax(
-                self.delta * discrimination_scores,  # using delta as β
+                self.delta *4* discrimination_scores,  # using delta as β
                 dim=1
             )  # (T, k), sums to 1 over lines
             
             # Stage 2: Local geometric scores
             # geometric_score = -δ · d(x, line)
-            # dist = torch.norm(
-            #     input_projected_translated - input_translated.unsqueeze(1), 
-            #     dim=-1
-            # )  # (T, k, N)
-            # geometric_scores = -self.delta * dist  # (T, k, N)
+            dist = torch.norm(
+                input_projected_translated - input_translated.unsqueeze(1), 
+                dim=-1
+            )  # (T, k, N)
+            geometric_scores = -self.delta * dist  # (T, k, N)
             
             # Combine: log(π) + geometric_score
             # This implements: α ∝ π(θᵢ) · exp(-δ · d(x, θᵢ))
             log_line_weights = torch.log(line_weights + 1e-8).unsqueeze(2)  # (T, k, 1)
-            # combined_scores = geometric_scores + log_line_weights  # (T, k, N)
+            combined_scores = geometric_scores + log_line_weights  # (T, k, N)
             
             # Normalize: softmax over lines for each point
-            log_line_weights = torch.log(line_weights + 1e-8).unsqueeze(2)  # (T, k, 1)
-            mass_input = torch.softmax(log_line_weights, dim=1).expand(-1, -1, N) / N
+            mass_input = torch.softmax(combined_scores, dim=1) / N  # (T, k, N)
         
         return mass_input, axis_coordinate
 
