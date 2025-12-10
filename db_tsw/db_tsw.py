@@ -70,16 +70,26 @@ class TWConcurrentLines():
         return tw, sub_mass_target_cumsum, edge_length
 
     def get_mass_and_coordinate(self, X, Y, theta, intercept):
-        # for the last dimension
-        # 0, 1, 2, ...., N -1 is of distribution 1
-        # N, N + 1, ...., 2N -1 is of distribution 2
         N, dn = X.shape
-        mass_X, axis_coordinate_X = self.project(X, theta=theta, intercept=intercept)
-        mass_Y, axis_coordinate_Y = self.project(Y, theta=theta, intercept=intercept)
-
+        
+        if self.mass_division == 'balanced_distance_based':
+            # Concat X and Y for balanced distance computation
+            XY = torch.cat([X, Y], dim=0)  # (2N, d)
+            mass_XY, axis_coordinate_XY = self.project(XY, theta=theta, intercept=intercept)
+            
+            # Split back
+            mass_X = mass_XY[:, :, :N]
+            mass_Y = mass_XY[:, :, N:]
+            axis_coordinate_X = axis_coordinate_XY[:, :, :N]
+            axis_coordinate_Y = axis_coordinate_XY[:, :, N:]
+        else:
+            # Original: project X and Y separately
+            mass_X, axis_coordinate_X = self.project(X, theta=theta, intercept=intercept)
+            mass_Y, axis_coordinate_Y = self.project(Y, theta=theta, intercept=intercept)
+        
         combined_axis_coordinate = torch.cat((axis_coordinate_X, axis_coordinate_Y), dim=2)
         massXY = torch.cat((mass_X, -mass_Y), dim=2)
-
+        
         return combined_axis_coordinate, massXY
 
     def project(self, input, theta, intercept):
@@ -101,16 +111,16 @@ class TWConcurrentLines():
             weight = -self.delta*dist
             mass_input = torch.softmax(weight, dim=-2)/N
         elif self.mass_division == 'balanced_distance_based':
-            dist = torch.norm(input_projected_translated - input_translated.unsqueeze(1), dim=-1)  # (T, k, 2N)
-    
-            # Aggregate distance per line (average over all points X and Y)
-            avg_dist_per_line = dist.mean(dim=2)  # (T, k) - average distance to each line
+            dist = torch.norm(input_projected_translated - input_translated.unsqueeze(1), dim=-1)  # (T, k, N) where N could be 2N
+        
+            # Aggregate distance per line
+            avg_dist_per_line = dist.mean(dim=2)  # (T, k)
             
-            # Softmax to get mass allocation per line (smaller distance = more mass)
-            mass_per_line = torch.softmax(-self.delta * avg_dist_per_line, dim=1)  # (T, k) sums to 1
+            # Softmax over lines
+            mass_per_line = torch.softmax(-self.delta * avg_dist_per_line, dim=1)  # (T, k)
             
-            # Each point gets mass proportional to line's total mass
-            mass_input = mass_per_line.unsqueeze(2).expand(-1, -1, 2 * N) / (2 * N)  # (T, k, 2N)
+            # Broadcast to all points
+            mass_input = mass_per_line.unsqueeze(2).expand(-1, -1, N) / N  # (T, k, N)
         
         return mass_input, axis_coordinate
 
