@@ -118,7 +118,7 @@ for k, title in enumerate(titles):
                     gen_mode='gaussian_raw',
                     device='cuda'
                 )  # uniform
-                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='uniform', p=args.p)
+                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='balanced_distance_based', p=args.p)
                 end_time = time.time()  # End timing
                 # print(f"Time taken for TWD uniform: {end_time - start_time:.4f} seconds")
 

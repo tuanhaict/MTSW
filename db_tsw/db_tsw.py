@@ -17,8 +17,8 @@ class TWConcurrentLines():
         self.delta = delta
         self.mass_division = mass_division
 
-        assert self.mass_division in ['uniform', 'distance_based'], \
-            "Invalid mass division. Must be one of 'uniform', 'distance_based'"
+        assert self.mass_division in ['uniform', 'distance_based', 'balanced_distance_based'], \
+            "Invalid mass division. Must be one of 'uniform', 'distance_based', 'balanced_distance_based'"
 
     def __call__(self, X, Y, theta, intercept):
         X = X.to(self.device)
@@ -100,6 +100,17 @@ class TWConcurrentLines():
             dist = (torch.norm(input_projected_translated - input_translated.unsqueeze(1), dim = -1))
             weight = -self.delta*dist
             mass_input = torch.softmax(weight, dim=-2)/N
+        elif self.mass_division == 'balanced_distance_based':
+            dist = torch.norm(input_projected_translated - input_translated.unsqueeze(1), dim=-1)  # (T, k, 2N)
+    
+            # Aggregate distance per line (average over all points X and Y)
+            avg_dist_per_line = dist.mean(dim=2)  # (T, k) - average distance to each line
+            
+            # Softmax to get mass allocation per line (smaller distance = more mass)
+            mass_per_line = torch.softmax(-self.delta * avg_dist_per_line, dim=1)  # (T, k) sums to 1
+            
+            # Each point gets mass proportional to line's total mass
+            mass_input = mass_per_line.unsqueeze(2).expand(-1, -1, 2 * N) / (2 * N)  # (T, k, 2N)
         
         return mass_input, axis_coordinate
 
