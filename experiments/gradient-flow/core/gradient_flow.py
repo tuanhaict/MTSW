@@ -43,7 +43,7 @@ class GF():
         self.device=device
         self.theta=None # This is for max-GSW
 
-    def sw(self,X,Y,theta=None):
+    def sw(self,X,Y,theta=None, p=2):
         N,dn = X.shape
         M,dm = Y.shape
         assert dn==dm and M==N
@@ -55,7 +55,9 @@ class GF():
 
         Xslices_sorted=torch.sort(Xslices,dim=0)[0]
         Yslices_sorted=torch.sort(Yslices,dim=0)[0]
-        return torch.sum((Xslices_sorted-Yslices_sorted)**2)
+        wpsq_per_slice = torch.mean((Xslices_sorted - Yslices_sorted)**p, dim=0)  # (k,)
+
+        return torch.mean(wpsq_per_slice)**(1./p)
     
     def SWGG_CP(self,X,Y,theta):
         n,dn=X.shape

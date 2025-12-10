@@ -89,7 +89,7 @@ for k, title in enumerate(titles):
 
             if k == 0:
                 start_time = time.time()  # Start timing
-                loss += gsw_res.sw(X.to(device), Y, theta=None)
+                loss += gsw_res.sw(X.to(device), Y, theta=None, p=args.p)
                 end_time = time.time()  # End timing
                 # print(f"Time taken for SW: {end_time - start_time:.4f} seconds")
             elif k == 1:
