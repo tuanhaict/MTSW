@@ -82,7 +82,7 @@ for k, title in enumerate(titles):
         mean_X = torch.mean(X, dim=0, keepdim=True).to(device)
         mean_Y = torch.mean(Y, dim=0, keepdim=True).to(device)
         std_X = torch.std(X, dim=0, keepdim=True).to(device)
-        mean = (mean_X + mean_Y) / 2.0
+        mean = ((mean_X + mean_Y) / 2.0).detach()
 
         for t in tqdm(range(nofiterations)):
             theta = torch.ones(len(modes), d)
