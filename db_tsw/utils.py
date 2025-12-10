@@ -8,14 +8,6 @@ def svd_orthogonalize(matrix):
     U, _, _ = torch.linalg.svd(matrix, full_matrices=False)
     return U
 
-
-def compute_adaptive_mean(X, Y, device='cuda'):
-    """Compute midpoint of centroids."""
-    centroid_X = X.mean(dim=0).to(device)
-    centroid_Y = Y.mean(dim=0).to(device)
-    return (centroid_X + centroid_Y) / 2
-
-
 def generate_trees_frames(ntrees, nlines, d, mean=128, std=0.1, device='cuda', gen_mode='gaussian_raw'):    
     assert gen_mode in ['gaussian_raw', 'gaussian_orthogonal'], "Invalid gen_mode"
     
@@ -39,6 +31,11 @@ def generate_trees_frames(ntrees, nlines, d, mean=128, std=0.1, device='cuda', g
         theta = theta.transpose(-2, -1)
     
     return theta, intercept
+def compute_adaptive_mean(X, Y, device='cuda'):
+    """Compute midpoint of centroids."""
+    centroid_X = X.mean(dim=0).to(device)
+    centroid_Y = Y.mean(dim=0).to(device)
+    return (centroid_X + centroid_Y) / 2
 def estimate_sw_1d_from_random_pairs(X, Y, n_pairs=4, device=None):
     if device is None:
         device = X.device
