@@ -18,7 +18,7 @@ dataset_name = args.dataset_name
 nofiterations = args.num_iter
 seeds = range(1,args.num_seeds+1)
 modes = ['linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear', 'linear']
-titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-RGT-random", "TSW-SL-RGT"]
+titles = ['SW', 'TSW-SL-distance-based', 'TSW-SL-uniform', 'TSW-SL-orthorgonal', "TSW-SL-RGT-dis", "TSW-SL-RGT-dis-mean"]
 colors = ['blue', 'orange', 'red', 'green', 'purple', 'brown', 'pink', 'gray']
 # Arrays to store results
 results = {}
@@ -164,9 +164,24 @@ for k, title in enumerate(titles):
                     mean=mean_X,
                     std=args.std,
                     device='cuda',
-                    root_mode='adaptive'
-                )  # orthogonal
-                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='distance_based', p=args.p, delta=args.delta)
+                    root_mode='random'
+                )  # uniform
+                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='discrimination_based', p=args.p)
+                end_time = time.time()
+            elif k == 6:
+                start_time = time.time()  # Start timing
+                theta_twd, intercept_twd = generate_random_projecting_tree_frames(
+                    X=X,
+                    Y=Y,
+                    ntrees=int(args.L / args.n_lines),
+                    nlines=args.n_lines,
+                    d=X.shape[1],
+                    mean=mean,
+                    std=args.std,
+                    device='cuda',
+                    root_mode='random'
+                )  # uniform
+                loss += gradient_flow.TWD(X=X.to(device), Y=Y, theta=theta_twd, intercept=intercept_twd, mass_division='discrimination_based', p=args.p)
                 end_time = time.time()
             optimizer.zero_grad()
             loss.backward()
