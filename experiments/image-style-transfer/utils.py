@@ -264,17 +264,17 @@ def transform_SW(src,target,src_label,origin,sw_type='sw',L=10,num_iter=1000, lr
             g_loss_twd_distance.backward()
             opt_twd_distance.step()
             s.data = torch.clamp(s, min=0)
-    if(sw_type == 'twd'):
-        opt_twd_distance = torch.optim.SGD([s], lr=lr_tw)
+    if(sw_type == 'twd_dis'):
+        opt_twd_dis = torch.optim.SGD([s], lr=lr_tw)
         for _ in tqdm(range(num_iter_tw)):
-            opt_twd_distance.zero_grad()
+            opt_twd_dis.zero_grad()
             theta_twd, intercept_twd = generate_trees_frames(ntrees=n_trees_tw, nlines=n_lines_tw, d=s.shape[1], mean=mean_t, std = std, gen_mode = 'gaussian_raw', device='cuda')
-            g_loss_twd_distance = TWD(s, t, theta_twd, intercept_twd, mass_division = 'distance_based', delta = delta)
-            g_loss_twd_distance =torch.sqrt(g_loss_twd_distance.mean())
-            g_loss_twd_distance = g_loss_twd_distance * s.shape[0]
-            opt_twd_distance.zero_grad()
-            g_loss_twd_distance.backward()
-            opt_twd_distance.step()
+            g_loss_twd_dis = TWD(s, t, theta_twd, intercept_twd, mass_division = 'discrimination_based', delta = delta)
+            g_loss_twd_dis =torch.sqrt(g_loss_twd_dis.mean())
+            g_loss_twd_dis = g_loss_twd_dis* s.shape[0]
+            opt_twd_dis.zero_grad()
+            g_loss_twd_dis.backward()
+            opt_twd_dis.step()
             s.data = torch.clamp(s, min=0)
 
     if(sw_type == 'twd_ortho'):
