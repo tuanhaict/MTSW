@@ -303,7 +303,7 @@ def transform_SW(src,target,src_label,origin,sw_type='sw',L=10,num_iter=1000, lr
             g_loss_twd_uniform.backward()
             opt_twd_uniform.step()
             s.data = torch.clamp(s, min=0)
-    if sw_type != 'twd' and sw_type != 'twd_uniform' and sw_type != 'twd_ortho':
+    if sw_type != 'twd' and sw_type != 'twd_uniform' and sw_type != 'twd_ortho' and sw_type != 'twd_dis':
         for _ in tqdm(range(num_iter)):
             opt.zero_grad()
             if (sw_type == 'sw'):
