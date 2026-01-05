@@ -152,6 +152,15 @@ for _ in range(1000):
     a = torch.randn(100)
 
 start = time.time()
+TWcluster_dis,TW_dis = transform_SW(source_values,target_values,source_labels,source,L=args.L,sw_type='twd_dis',num_iter=args.num_iter, lr_tw = args.lr_tw, num_iter_tw = args.num_iter_tw, n_trees_tw = int(args.L/ args.n_lines_tw), n_lines_tw = args.n_lines_tw, delta = args.delta, std = args.std)
+TWtime_dis = np.round(time.time() - start,2)
+print("Done TW discriminative mass")
+
+for _ in range(1000):
+    a = np.random.randn(100)
+    a = torch.randn(100)
+
+start = time.time()
 TWcluster_uniform,TW_uniform = transform_SW(source_values,target_values,source_labels,source,L=args.L,sw_type='twd_uniform',num_iter=args.num_iter, lr_tw = args.lr_tw, num_iter_tw = args.num_iter_tw, n_trees_tw = int(args.L/ args.n_lines_tw), n_lines_tw = args.n_lines_tw, delta = args.delta, std = args.std)
 TWtime_uniform = np.round(time.time() - start,2)
 print("Done TW uniform")
@@ -309,6 +318,7 @@ reshaped_target3=target_values.reshape(-1,3)
 
 
 TWcluster = TWcluster/np.max(TWcluster)*255
+TWcluster_dis = TWcluster_dis/np.max(TWcluster_dis)*255
 TWcluster_uniform = TWcluster_uniform/np.max(TWcluster_uniform)*255
 SWcluster=SWcluster/np.max(SWcluster)*255
 maxSWcluster=maxSWcluster/np.max(maxSWcluster)*255
@@ -335,6 +345,7 @@ UCVSWcluster=UCVSWcluster/np.max(UCVSWcluster)*255
 
 
 C_TW = ot.dist(TWcluster, reshaped_target3)
+C_TW_dis = ot.dist(TWcluster_dis, reshaped_target3)
 C_TW_uniform = ot.dist(TWcluster_uniform, reshaped_target3)
 C_SW = ot.dist(SWcluster,reshaped_target3)
 C_maxSW = ot.dist(maxSWcluster,reshaped_target3)
@@ -356,6 +367,7 @@ C_ROCQSW = ot.dist(ROCQSWcluster,reshaped_target3)
 C_UCVSW = ot.dist(UCVSWcluster,reshaped_target3)
 
 W_TW = np.round(ot.emd2([],[],C_TW),2)
+W_TW_dis = np.round(ot.emd2([],[],C_TW_dis),2)
 W_TW_uniform = np.round(ot.emd2([],[],C_TW_uniform),2)
 W_SW = np.round(ot.emd2([],[],C_SW),2)
 W_maxSW = np.round(ot.emd2([],[],C_maxSW),2)
@@ -384,6 +396,7 @@ ax1[0,0].imshow(source)
 ax1[0,1].set_title('Db-TSW, $W_2={}$'.format(W_TW), fontsize=12)
 ax1[0,1].imshow(TW)
 
+
 ax1[0,2].set_title(r'Db-TSW$^\perp$, $W_2={}$'.format(W_TW_ortho), fontsize=12)
 ax1[0,2].imshow(TW_ortho)
 
@@ -394,8 +407,8 @@ ax1[0,4].set_title('SW, $W_2={}$'.format(W_SW), fontsize=12)
 ax1[0,4].imshow(SW)
 
 # additional images
-ax1[1,0].set_title('MaxSW, $W_2={}$'.format(W_maxSW), fontsize=12)
-ax1[1,0].imshow(maxSW)
+ax1[1,0].set_title('Db-TSW-dis, $W_2={}$'.format(W_TW_dis), fontsize=12)
+ax1[1,0].imshow(TW_dis)
 
 ax1[1,1].set_title('GQSW, $W_2={}$'.format(W_NQSW), fontsize=12)
 ax1[1,1].imshow(NQSW)
@@ -469,6 +482,7 @@ plt.savefig(name_image)
 
 log_dict = {
     'Db-TSW': W_TW,
+    'Db-TSW-dis': W_TW_dis,
     'Db-TSW$^\perp$': W_TW_ortho,
     'TSW-SL': W_TW_uniform,
     'SW': W_SW,
