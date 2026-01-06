@@ -165,7 +165,7 @@ class TWConcurrentLines():
             # Stage 1: Global line weights from discrimination
             # π(θᵢ) = softmax(β · s(θᵢ))
             line_weights = torch.softmax(
-                self.delta *4* discrimination_scores,  # using delta as β
+                self.delta* discrimination_scores,  # using delta as β
                 dim=1
             )  # (T, k), sums to 1 over lines
             
